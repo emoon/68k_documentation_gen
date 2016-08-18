@@ -1,0 +1,6 @@
+[package]
+name = "68k_cycle_table_gen"
+version = "0.1.0"
+authors = ["Daniel Collin <daniel@collin.com>"]
+
+[dependencies]
