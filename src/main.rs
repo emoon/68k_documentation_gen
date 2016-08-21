@@ -2,14 +2,8 @@ use std::process::Command;
 use std::fs::File;
 use std::io::Write;
 
-#[derive(PartialEq)]
-enum OpType {
-    Word,
-    Long,
-}
-
 #[derive(PartialEq, Clone)]
-enum EaType {
+enum Ea {
     Any,
     Immidate,
     DataRegister,
@@ -17,16 +11,25 @@ enum EaType {
     Memory,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+enum Size {
+    _Byte,
+    Word,
+    Long,
+}
+
 struct Op {
     name: &'static str,
+    print_name: &'static str,
     count: usize,
-    ea_type: EaType,
+    ea_type: Ea,
 }
 
 impl Op {
-    fn new(name: &'static str, count: usize, ea_type: EaType) -> Op {
+    fn new(name: &'static str, print_name: &'static str, count: usize, ea_type: Ea) -> Op {
         Op {
             name: name,
+            print_name: print_name,
             count: count,
             ea_type: ea_type,
         }
@@ -35,31 +38,46 @@ impl Op {
 
 #[derive(Clone)]
 struct CycleRule {
-    count: usize,
-    source: EaType,
-    dest: EaType,
+    word_count: usize,
+    long_count: usize,
+    source: Ea,
+    dest: Ea,
+}
+
+impl CycleRule {
+    fn new(word_count: usize, long_count: usize, source: Ea, dest: Ea) -> CycleRule {
+        CycleRule {
+            word_count: word_count,
+            long_count: long_count,
+            source: source,
+            dest: dest,
+        }
+    }
 }
 
 struct Instruction<'a> {
     name: &'static str,
-    op_type: OpType,
     cycle_rules: &'a [CycleRule],
 }
 
-fn calculate_cycle_count(inst: &Instruction, src: &Op, dest: &Op) -> usize {
+fn calculate_cycle_count(inst: &Instruction, src: &Op, dest: &Op, size: Size) -> usize {
     let mut cycle_count = 0;
 
     for rule in inst.cycle_rules {
-        if (src.ea_type == rule.source || rule.source == EaType::Any) &&
-           (dest.ea_type == rule.dest || rule.dest == EaType::Any) {
-            cycle_count = rule.count;
+        if (src.ea_type == rule.source || rule.source == Ea::Any) &&
+           (dest.ea_type == rule.dest || rule.dest == Ea::Any) {
+            match size {
+                Size::Word => cycle_count = rule.word_count,
+                Size::Long => cycle_count = rule.long_count,
+                _ => panic!("Not supported!"),
+            }
             break;
         }
     }
 
     cycle_count += src.count + dest.count;
 
-    if inst.op_type == OpType::Long {
+    if size == Size::Long {
         if src.count != 0 {
             cycle_count += 4;
         }
@@ -72,185 +90,225 @@ fn calculate_cycle_count(inst: &Instruction, src: &Op, dest: &Op) -> usize {
     cycle_count
 }
 
-fn main() {
-    let dest_types = [Op::new("d0", 0, EaType::DataRegister),
-                      Op::new("a0", 0, EaType::AddressRegister),
-                      Op::new("(a0)", 4, EaType::Memory),
-                      Op::new("(a0)+", 4, EaType::Memory),
-                      Op::new("-(a0)", 6, EaType::Memory),
-                      Op::new("2(a0)", 8, EaType::Memory),
-                      Op::new("2(a0,d0)", 10, EaType::Memory),
-                      Op::new("$4.W", 8, EaType::Memory),
-                      Op::new("$4.L", 12, EaType::Memory)];
+fn calc_cycle_count_one_op(inst: &Instruction, arg: &Op, size: Size) -> usize {
+    let mut cycle_count = 0;
 
-    let src_types = [Op::new("d0", 0, EaType::DataRegister),
-                     Op::new("a0", 0, EaType::AddressRegister),
-                     Op::new("(a0)", 4, EaType::Memory),
-                     Op::new("(a0)+", 4, EaType::Memory),
-                     Op::new("-(a0)", 6, EaType::Memory),
-                     Op::new("2(a0)", 8, EaType::Memory),
-                     Op::new("2(a0,d0)", 10, EaType::Memory),
-                     Op::new("$4.W", 8, EaType::Memory),
-                     Op::new("$4.L", 12, EaType::Memory),
-                     Op::new("2(pc)", 8, EaType::Memory),
-                     Op::new("2(pc,d0)", 10, EaType::Memory),
-                     Op::new("#2", 4, EaType::Immidate)];
+    for rule in inst.cycle_rules {
+        if arg.ea_type == rule.dest || rule.dest == Ea::Any {
+            match size {
+                Size::Word => cycle_count = rule.word_count,
+                Size::Long => cycle_count = rule.long_count,
+                _ => panic!("Not supported!"),
+            }
+            break;
+        }
+    }
 
-    let mut compile_status = Vec::new();
+    cycle_count += arg.count;
 
+    if size == Size::Long {
+        if arg.count != 0 {
+            cycle_count += 4;
+        }
+    }
+
+    cycle_count
+}
+
+
+fn compile_statement(statement: &str) -> bool {
     let filename = "temp.s";
 
-    let dst_print = [" Dn ",
-                     " An ",
-                     " (An) ",
-                     " (An)+ ",
-                     " -(An) ",
-                     " d(An) ",
-                     " d(An,Dn) ",
-                     " xxx.W ",
-                     " xxx.L "];
-    let src_print = ["| Dn       ",
-                     "| An       ",
-                     "| (An)     ",
-                     "| (An)+    ",
-                     "| -(An)    ",
-                     "| d(An)    ",
-                     "| d(An,Dn) ",
-                     "| xxx.W    ",
-                     "| xxx.L    ",
-                     "| d(Pc)    ",
-                     "| d(Pc,Dn) ",
-                     "| #xxx     "];
+    {
+        let mut file = File::create(filename).unwrap();
+        write!(file, " {}", statement).unwrap();
+    }
 
-    let instructions = [// Instruction {
-                        // name: "clr.w",
-                        // op_type: OpType::Word,
-                        // cycle_rules: &[
-                        // CycleRule { count: 4, source: EaType::DataRegister, dest: EaType::Any },
-                        // CycleRule { count: 8, source: EaType::DataRegister, dest: EaType::Memory },
-                        // ]
-                        // },
-                        //
-                        Instruction {
-                            name: "add.w",
-                            op_type: OpType::Word,
-                            cycle_rules: &[CycleRule {
-                                               count: 4,
-                                               source: EaType::Immidate,
-                                               dest: EaType::DataRegister,
-                                           },
-                                           CycleRule {
-                                               count: 8,
-                                               source: EaType::Immidate,
-                                               dest: EaType::Memory,
-                                           },
-                                           CycleRule {
-                                               count: 8,
-                                               source: EaType::Any,
-                                               dest: EaType::AddressRegister,
-                                           },
-                                           CycleRule {
-                                               count: 4,
-                                               source: EaType::Any,
-                                               dest: EaType::DataRegister,
-                                           },
-                                           CycleRule {
-                                               count: 8,
-                                               source: EaType::DataRegister,
-                                               dest: EaType::Memory,
-                                           }],
-                        },
-                        Instruction {
-                            name: "add.l",
-                            op_type: OpType::Long,
-                            cycle_rules: &[CycleRule {
-                                               count: 8,
-                                               source: EaType::Immidate,
-                                               dest: EaType::DataRegister,
-                                           },
-                                           CycleRule {
-                                               count: 8,
-                                               source: EaType::Immidate,
-                                               dest: EaType::Memory,
-                                           },
-                                           CycleRule {
-                                               count: 8,
-                                               source: EaType::Any,
-                                               dest: EaType::AddressRegister,
-                                           },
-                                           CycleRule {
-                                               count: 6,
-                                               source: EaType::Any,
-                                               dest: EaType::DataRegister,
-                                           },
-                                           CycleRule {
-                                               count: 12,
-                                               source: EaType::DataRegister,
-                                               dest: EaType::Memory,
-                                           }],
-                        } /* Instruction {
-                           * name: "and.l",
-                           * op_type: OpType::Word,
-                           * cycle_rules: &[
-                           * CycleRule { count: 6, source: EaType::Any, dest: EaType::DataRegister },
-                           * CycleRule { count: 12, source: EaType::DataRegister, dest: EaType::Memory },
-                           * ]
-                           * }
-                           * */];
+    let output =
+        Command::new("vasmm68k_mot").arg(filename).output().expect("failed to execute process");
 
-    for inst in &instructions {
-        compile_status.clear();
-        for src in &src_types {
-            for dst in &dest_types {
+    output.status.success()
+}
 
-                {
-                    let mut file = File::create(filename).unwrap();
-                    write!(file, " {} {},{}", inst.name, src.name, dst.name).unwrap();
-                }
+fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], dest_table: &[Op]) {
+    print!("| {name:<width$}", name = name, width = 9);
 
-                let output = Command::new("vasmm68k_mot")
-                    .arg("-quiet")
-                    .arg(filename)
-                    .output()
-                    .expect("failed to execute process");
+    for dst in dest_table {
+        print!("| {} ", dst.print_name);
+    }
 
-                if output.status.success() {
-                    compile_status.push(Some(calculate_cycle_count(&inst, &src, &dst)));
-                } else {
-                    compile_status.push(None);
-                }
+    println!("|");
+    println!("|----------|----|----|------|-------|-------|-------|----------|-------|-------|");
+
+    let mut index = 0;
+
+    for src in src_table {
+        print!("| {name:<width$}", name = src.print_name, width = 9);
+
+        for dest in dest_table {
+            if let Some(cycle_count) = cycles[index] {
+                print!("|{number:^width$}",
+                       number = cycle_count,
+                       width = dest.print_name.len() + 2);
+            } else {
+                print!("|{number:^width$}",
+                       number = "*",
+                       width = dest.print_name.len() + 2);
             }
-        }
-
-        // print header
-        print!("| {name:<width$}", name = inst.name, width = 9);
-
-        for dst in &dst_print {
-            print!("|{}", dst);
+            index += 1;
         }
 
         println!("|");
-        println!("|----------|----|----|------|-------|-------|-------|----------|-------|-------|");
+    }
 
-        let mut index = 0;
+    println!("");
+}
 
-        for src in &src_print {
-            print!("{}", src);
+fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
+    print!("| {name:<width$}", name = name, width = 9);
 
-            for dest_name in &dst_print {
-                if let Some(cycle_count) = compile_status[index] {
-                    print!("|{number:^width$}",
-                           number = cycle_count,
-                           width = dest_name.len());
+    for dst in dest_table {
+        print!("| {} ", dst.print_name);
+    }
+
+    println!("|");
+    println!("|----------|----|----|------|-------|-------|-------|----------|-------|-------|");
+
+    let mut index = 0;
+
+    print!("| {name:<width$}", name = " ", width = 9);
+
+    for dest in dest_table {
+        if let Some(cycle_count) = cycles[index] {
+            print!("|{number:^width$}",
+                   number = cycle_count,
+                   width = dest.print_name.len() + 2);
+        } else {
+            print!("|{number:^width$}",
+                   number = "*",
+                   width = dest.print_name.len() + 2);
+        }
+        index += 1;
+    }
+
+    println!("|");
+    println!("");
+}
+
+fn generate_table(inst: &Instruction,
+                  name: &str,
+                  size: Size,
+                  src_table: Option<&[Op]>,
+                  dest_table: &[Op]) {
+    let mut cycles = Vec::with_capacity(20 * 20);
+
+    if let Some(src_opts) = src_table {
+        for src in src_opts {
+            for dst in dest_table {
+                let statement = format!("{} {},{}", name, src.name, dst.name);
+                if compile_statement(&statement) {
+                    cycles.push(Some(calculate_cycle_count(inst, &src, &dst, size)));
                 } else {
-                    print!("|{number:^width$}", number = "*", width = dest_name.len());
+                    cycles.push(None);
                 }
-                index += 1;
             }
-
-            println!("|");
         }
 
-        println!("");
+        print_grid_table(name, &cycles, &src_opts, dest_table);
+    } else {
+        for dst in dest_table {
+            let statement = format!("{} {}", name, dst.name);
+            if compile_statement(&statement) {
+                cycles.push(Some(calc_cycle_count_one_op(inst, &dst, size)));
+            } else {
+                cycles.push(None);
+            }
+        }
+
+        print_table(name, &cycles, dest_table);
+    }
+}
+
+fn main() {
+    let dest_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
+                      Op::new("a0", "An", 0, Ea::AddressRegister),
+                      Op::new("(a0)", "(An)", 4, Ea::Memory),
+                      Op::new("(a0)+", "(An)+", 4, Ea::Memory),
+                      Op::new("-(a0)", "-(An)", 6, Ea::Memory),
+                      Op::new("2(a0)", "d(An)", 8, Ea::Memory),
+                      Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
+                      Op::new("$4.W", "xxx.W", 8, Ea::Memory),
+                      Op::new("$4.L", "xxx.L", 12, Ea::Memory)];
+
+    let src_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
+                     Op::new("a0", "An", 0, Ea::AddressRegister),
+                     Op::new("(a0)", "(An)", 4, Ea::Memory),
+                     Op::new("(a0)+", "(An)+", 4, Ea::Memory),
+                     Op::new("-(a0)", "-(An)", 6, Ea::Memory),
+                     Op::new("2(a0)", "d(An)", 8, Ea::Memory),
+                     Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
+                     Op::new("$4.W", "xxx.W", 8, Ea::Memory),
+                     Op::new("$4.L", "xxx.L", 12, Ea::Memory),
+                     Op::new("2(pc)", "d(PC)", 8, Ea::Memory),
+                     Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
+                     Op::new("#2", "#xxx", 4, Ea::Immidate)];
+
+    let inst_2_ops_000 = [
+        Instruction {
+                name: "abcd",
+                cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
+                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+        },
+        Instruction {
+                name: "add",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
+                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+        },
+        Instruction {
+                name: "addq",
+                cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
+        },
+        Instruction {
+                name: "addx",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
+                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+        },
+        Instruction {
+                name: "and",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+        },
+        Instruction {
+                name: "bchg",
+                cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
+        },
+    ];
+
+    let inst_1_ops_000 = [Instruction {
+                              name: "clr",
+                              cycle_rules: &[CycleRule::new(4, 8, Ea::Any, Ea::Any)],
+                          }];
+
+    for inst in &inst_2_ops_000 {
+        let name_long = format!("{}.l", inst.name);
+
+        generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
+        generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
+    }
+
+    // Generate instructions with one op
+
+    for inst in &inst_1_ops_000 {
+        let name_long = format!("{}.l", inst.name);
+
+        generate_table(&inst, inst.name, Size::Word, None, &dest_types);
+        generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
 }
