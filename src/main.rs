@@ -90,6 +90,32 @@ fn calculate_cycle_count(inst: &Instruction, src: &Op, dest: &Op, size: Size) ->
     cycle_count
 }
 
+fn calc_cycle_count_one_op(inst: &Instruction, arg: &Op, size: Size) -> usize {
+    let mut cycle_count = 0;
+
+    for rule in inst.cycle_rules {
+        if arg.ea_type == rule.dest || rule.dest == Ea::Any {
+            match size {
+                Size::Word => cycle_count = rule.word_count,
+                Size::Long => cycle_count = rule.long_count,
+                _ => panic!("Not supported!"),
+            }
+            break;
+        }
+    }
+
+    cycle_count += arg.count;
+
+    if size == Size::Long {
+        if arg.count != 0 {
+            cycle_count += 4;
+        }
+    }
+
+    cycle_count
+}
+
+
 fn compile_statement(statement: &str) -> bool {
     let filename = "temp.s";
 
@@ -138,6 +164,37 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
     println!("");
 }
 
+fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
+    print!("| {name:<width$}", name = name, width = 9);
+
+    for dst in dest_table {
+        print!("| {} ", dst.print_name);
+    }
+
+    println!("|");
+    println!("|----------|----|----|------|-------|-------|-------|----------|-------|-------|");
+
+    let mut index = 0;
+
+    print!("| {name:<width$}", name = " ", width = 9);
+
+    for dest in dest_table {
+        if let Some(cycle_count) = cycles[index] {
+            print!("|{number:^width$}",
+                   number = cycle_count,
+                   width = dest.print_name.len() + 2);
+        } else {
+            print!("|{number:^width$}",
+                   number = "*",
+                   width = dest.print_name.len() + 2);
+        }
+        index += 1;
+    }
+
+    println!("|");
+    println!("");
+}
+
 fn generate_table(inst: &Instruction,
                   name: &str,
                   size: Size,
@@ -158,6 +215,17 @@ fn generate_table(inst: &Instruction,
         }
 
         print_grid_table(name, &cycles, &src_opts, dest_table);
+    } else {
+        for dst in dest_table {
+            let statement = format!("{} {}", name, dst.name);
+            if compile_statement(&statement) {
+                cycles.push(Some(calc_cycle_count_one_op(inst, &dst, size)));
+            } else {
+                cycles.push(None);
+            }
+        }
+
+        print_table(name, &cycles, dest_table);
     }
 }
 
@@ -185,16 +253,21 @@ fn main() {
                      Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
                      Op::new("#2", "#xxx", 4, Ea::Immidate)];
 
-    let inst_2_ops_00 = [Instruction {
-                             name: "add",
-                             cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                                            CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                                            CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
-                                            CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                                            CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-                         }];
+    let inst_2_ops_000 = [Instruction {
+                              name: "add",
+                              cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                                             CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                                             CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
+                                             CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                                             CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+                          }];
 
-    for inst in &inst_2_ops_00 {
+    let inst_1_ops_000 = [Instruction {
+                              name: "clr",
+                              cycle_rules: &[CycleRule::new(4, 8, Ea::Any, Ea::Any)],
+                          }];
+
+    for inst in &inst_2_ops_000 {
         // generate for .w and .l
 
         let name_word = format!("{}.w", inst.name);
@@ -202,6 +275,17 @@ fn main() {
 
         generate_table(&inst, &name_word, Size::Word, Some(&src_types), &dest_types);
         generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
+    }
 
+    // Generate instructions with one op
+
+    for inst in &inst_1_ops_000 {
+        // generate for .w and .l
+
+        let name_word = format!("{}.w", inst.name);
+        let name_long = format!("{}.l", inst.name);
+
+        generate_table(&inst, &name_word, Size::Word, None, &dest_types);
+        generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
 }
