@@ -253,14 +253,31 @@ fn main() {
                      Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
                      Op::new("#2", "#xxx", 4, Ea::Immidate)];
 
-    let inst_2_ops_000 = [Instruction {
-                              name: "add",
-                              cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                                             CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                                             CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
-                                             CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                                             CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-                          }];
+    let inst_2_ops_000 = [
+        Instruction {
+                name: "abcd",
+                cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
+                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+        },
+        Instruction {
+                name: "add",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
+                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+        },
+        Instruction {
+                name: "addq",
+                cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
+        },
+        Instruction {
+                name: "addx",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
+                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+        },
+    ];
 
     let inst_1_ops_000 = [Instruction {
                               name: "clr",
@@ -268,24 +285,18 @@ fn main() {
                           }];
 
     for inst in &inst_2_ops_000 {
-        // generate for .w and .l
-
-        let name_word = format!("{}.w", inst.name);
         let name_long = format!("{}.l", inst.name);
 
-        generate_table(&inst, &name_word, Size::Word, Some(&src_types), &dest_types);
+        generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
         generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
     }
 
     // Generate instructions with one op
 
     for inst in &inst_1_ops_000 {
-        // generate for .w and .l
-
-        let name_word = format!("{}.w", inst.name);
         let name_long = format!("{}.l", inst.name);
 
-        generate_table(&inst, &name_word, Size::Word, None, &dest_types);
+        generate_table(&inst, inst.name, Size::Word, None, &dest_types);
         generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
 }
