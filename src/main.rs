@@ -277,6 +277,18 @@ fn main() {
                 cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
                                 CycleRule::new(6, 10, Ea::Any, Ea::Any)],
         },
+        Instruction {
+                name: "and",
+                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+        },
+        Instruction {
+                name: "bchg",
+                cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
+                                CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
+        },
     ];
 
     let inst_1_ops_000 = [Instruction {
