@@ -1,2 +1,2 @@
-# 68k_cycle_table_gen
-Generate markdown CPU cycle tables for m68k
+# 68k_documentation_gen
+Generator for 68k documentation
