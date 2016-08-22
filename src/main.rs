@@ -143,13 +143,13 @@ fn compile_statement(statement: &str) -> bool {
         write!(file, " {}", statement).unwrap();
     }
 
-    let output =
-        Command::new(VASM_EXE)
-            .arg(TEMP_FILE)
-            .arg("-Fbin")
-            .arg("-o")
-            .arg(TEMP_FILE_OUT)
-            .output().expect("failed to execute process");
+    let output = Command::new(VASM_EXE)
+        .arg(TEMP_FILE)
+        .arg("-Fbin")
+        .arg("-o")
+        .arg(TEMP_FILE_OUT)
+        .output()
+        .expect("failed to execute process");
 
     output.status.success()
 }
@@ -167,22 +167,34 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
     let mut index = 0;
 
     for src in src_table {
-        print!("| {name:<width$}", name = src.print_name, width = 9);
+        let mut skip_count = 0;
 
-        for dest in dest_table {
-            if let Some(cycle_count) = cycles[index] {
-                print!("|{number:^width$}",
-                       number = cycle_count,
-                       width = dest.print_name.len() + 2);
-            } else {
-                print!("|{number:^width$}",
-                       number = "*",
-                       width = dest.print_name.len() + 2);
+        for i in index..index + 9 {
+            if let None = cycles[i] {
+                skip_count += 1;
             }
-            index += 1;
         }
 
-        println!("|");
+        if skip_count != 9 {
+            print!("| {name:<width$}", name = src.print_name, width = 9);
+
+            for dest in dest_table {
+                if let Some(cycle_count) = cycles[index] {
+                    print!("|{number:^width$}",
+                           number = cycle_count,
+                           width = dest.print_name.len() + 2);
+                } else {
+                    print!("|{number:^width$}",
+                           number = "*",
+                           width = dest.print_name.len() + 2);
+                }
+                index += 1;
+            }
+
+            println!("|");
+        } else {
+            index += 9;
+        }
     }
 
     println!("");
@@ -217,6 +229,25 @@ fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
 
     println!("|");
     println!("");
+}
+
+fn print_instruction_header(inst: &Instruction) {
+    let name = inst.name.to_uppercase();
+    println!("## {}\n", name);
+    if let Some(ref desc) = inst._desc {
+        println!("**Operation:**      {}\n", desc.operation);
+
+        print!("**Assembler:** ");
+        for assem in desc.assembler {
+            print!("{}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;", assem);
+        }
+        println!("\n\n**Attributes:** Size = ({})\n", desc.attributes);
+
+        println!("**Description:** {}\n", desc.description);
+    }
+    else {
+        println!("__No Description__\n");
+    }
 }
 
 fn generate_table(inst: &Instruction,
@@ -277,49 +308,48 @@ fn main() {
                      Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
                      Op::new("#2", "#xxx", 4, Ea::Immidate)];
 
-    let inst_2_ops_000 = [
-        Instruction {
-                name: "abcd",
-                _desc: None,
-                cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
-                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-        },
-        Instruction {
-                name: "add",
-                _desc: Some(ADD_DESC),
-                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                                CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
-                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-        },
-        Instruction {
-                name: "addq",
-                _desc: None,
-                cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
-                                CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
-        },
-        Instruction {
-                name: "addx",
-                _desc: None,
-                cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
-                                CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-        },
-        Instruction {
-                name: "and",
-                _desc: None,
-                cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                                CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                                CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                                CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-        },
-        Instruction {
-                name: "bchg",
-                _desc: None,
-                cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
-                                CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
-        },
-    ];
+    let inst_2_ops_000 =
+        [/*Instruction {
+             name: "abcd",
+             _desc: None,
+             cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
+                            CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+         },*/
+         Instruction {
+             name: "add",
+             _desc: Some(ADD_DESC),
+             cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                            CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                            CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
+                            CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                            CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+         }/*,
+         Instruction {
+             name: "addq",
+             _desc: None,
+             cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
+                            CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
+         },
+         Instruction {
+             name: "addx",
+             _desc: None,
+             cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
+                            CycleRule::new(6, 10, Ea::Any, Ea::Any)],
+         },
+         Instruction {
+             name: "and",
+             _desc: None,
+             cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
+                            CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
+                            CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
+                            CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
+         },
+         Instruction {
+             name: "bchg",
+             _desc: None,
+             cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
+                            CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
+         }*/];
 
     let inst_1_ops_000 = [Instruction {
                               name: "clr",
@@ -329,7 +359,8 @@ fn main() {
 
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
-
+        
+        print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
         generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
     }
@@ -339,6 +370,7 @@ fn main() {
     for inst in &inst_1_ops_000 {
         let name_long = format!("{}.l", inst.name);
 
+        print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, None, &dest_types);
         generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
