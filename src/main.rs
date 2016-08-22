@@ -57,6 +57,10 @@ impl CycleRule {
 
 struct Instruction<'a> {
     name: &'static str,
+    operation: &'static str,
+    syntax: &'static str,
+    attributes: &'static str,
+    description: &'static str,
     cycle_rules: &'a [CycleRule],
 }
 
@@ -195,12 +199,33 @@ fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
     println!("");
 }
 
+fn print_instruction_header(inst: &Instruction) {
+/*
+    ## ADD
+
+    **Operation:** Source + Destination → Destination
+
+    **Assembler:** add < ea > ,Dn
+
+    **Attributes:**  Size = (Byte, Word, Long)
+
+    **Description:** 
+*/
+    println!("## {}\n", inst.name.to_uppercase());
+    println!("**Operation:** {}\n", inst.operation);
+    println!("**Assembler:** {}\n", inst.syntax);
+    println!("**Attributes:** {}\n", inst.attributes);
+    println!("**Description:** {}\n", inst.description);
+}
+
 fn generate_table(inst: &Instruction,
                   name: &str,
                   size: Size,
                   src_table: Option<&[Op]>,
                   dest_table: &[Op]) {
     let mut cycles = Vec::with_capacity(20 * 20);
+
+    print_instruction_header(inst);
 
     if let Some(src_opts) = src_table {
         for src in src_opts {
@@ -213,7 +238,6 @@ fn generate_table(inst: &Instruction,
                 }
             }
         }
-
         print_grid_table(name, &cycles, &src_opts, dest_table);
     } else {
         for dst in dest_table {
@@ -224,7 +248,6 @@ fn generate_table(inst: &Instruction,
                 cycles.push(None);
             }
         }
-
         print_table(name, &cycles, dest_table);
     }
 }
@@ -256,11 +279,19 @@ fn main() {
     let inst_2_ops_000 = [
         Instruction {
                 name: "abcd",
+                operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                 cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
                                 CycleRule::new(6, 10, Ea::Any, Ea::Any)],
         },
         Instruction {
                 name: "add",
+                operation: "Source + Destination → Destination",
+                syntax: "ADD < ea > ,Dn  ADD Dn, < ea >",
+                attributes: "Size = (Byte, Word, Long)",
+                description: " Adds the source operand to the destination operand using binary addition and stores the result in the destination location. The size of the operation may be specified as byte, word, or long. The mode of the instruction indicates which operand is the source and which is the destination, as well as the operand size.",
                 cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
@@ -269,16 +300,28 @@ fn main() {
         },
         Instruction {
                 name: "addq",
+                operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                 cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
         },
         Instruction {
                 name: "addx",
+                operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                 cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
                                 CycleRule::new(6, 10, Ea::Any, Ea::Any)],
         },
         Instruction {
                 name: "and",
+                operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                 cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
@@ -286,6 +329,10 @@ fn main() {
         },
         Instruction {
                 name: "bchg",
+                operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                 cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
         },
@@ -293,6 +340,10 @@ fn main() {
 
     let inst_1_ops_000 = [Instruction {
                               name: "clr",
+                              operation: "",
+                syntax: "",
+                attributes:  "",
+                description: "",
                               cycle_rules: &[CycleRule::new(4, 8, Ea::Any, Ea::Any)],
                           }];
 
