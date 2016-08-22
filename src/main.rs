@@ -138,7 +138,7 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
     print!("| {name:<width$}", name = name, width = 9);
 
     for dst in dest_table {
-        print!("| {} ", dst.print_name);
+        print!("| {} ", dst.print_name);    // prints top row
     }
 
     println!("|");
@@ -147,22 +147,34 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
     let mut index = 0;
 
     for src in src_table {
-        print!("| {name:<width$}", name = src.print_name, width = 9);
+        // precheck if row needs printed
+        let mut skip_count = 0;
 
-        for dest in dest_table {
-            if let Some(cycle_count) = cycles[index] {
-                print!("|{number:^width$}",
-                       number = cycle_count,
-                       width = dest.print_name.len() + 2);
-            } else {
-                print!("|{number:^width$}",
-                       number = "*",
-                       width = dest.print_name.len() + 2);
+        for cycle in cycles {
+            if let &Some(cc) = cycle { }
+            else {                
+                skip_count += 1;
             }
-            index += 1;
         }
 
-        println!("|");
+        if skip_count != 9 {
+            print!("| {name:<width$}", name = src.print_name, width = 9);
+
+            for dest in dest_table {
+                if let Some(cycle_count) = cycles[index] {
+                    print!("|{number:^width$}",
+                        number = cycle_count,
+                        width = dest.print_name.len() + 2);
+                } else {
+                    print!("|{number:^width$}",
+                        number = "*",
+                        width = dest.print_name.len() + 2);
+                }
+                index += 1;
+            }
+
+            println!("|");
+        }
     }
 
     println!("");
@@ -225,7 +237,6 @@ fn generate_table(inst: &Instruction,
                   dest_table: &[Op]) {
     let mut cycles = Vec::with_capacity(20 * 20);
 
-    print_instruction_header(inst);
 
     if let Some(src_opts) = src_table {
         for src in src_opts {
@@ -350,6 +361,7 @@ fn main() {
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
 
+        print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
         generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
     }
@@ -359,6 +371,7 @@ fn main() {
     for inst in &inst_1_ops_000 {
         let name_long = format!("{}.l", inst.name);
 
+        print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, None, &dest_types);
         generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
