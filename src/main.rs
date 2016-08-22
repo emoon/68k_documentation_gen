@@ -2,6 +2,22 @@ use std::process::Command;
 use std::fs::File;
 use std::io::Write;
 
+#[cfg(target_os="windows")]
+const VASM_EXE: &'static str = "bin/win/vasmm68k_mot.exe";
+
+#[cfg(target_os="macos")]
+const VASM_EXE: &'static str = "bin/mac/vasmm68k_mot";
+
+#[cfg(any(target_os="linux",
+            target_os="freebsd",
+            target_os="dragonfly",
+            target_os="netbsd",
+            target_os="openbsd"))]
+const VASM_EXE: &'static str = "vasmm68k_mot";
+
+const TEMP_FILE: &'static str = "target/temp.s";
+const TEMP_FILE_OUT: &'static str = "target/temp.o";
+
 #[derive(PartialEq, Clone)]
 enum Ea {
     Any,
@@ -117,15 +133,18 @@ fn calc_cycle_count_one_op(inst: &Instruction, arg: &Op, size: Size) -> usize {
 
 
 fn compile_statement(statement: &str) -> bool {
-    let filename = "temp.s";
-
     {
-        let mut file = File::create(filename).unwrap();
+        let mut file = File::create(TEMP_FILE).unwrap();
         write!(file, " {}", statement).unwrap();
     }
 
     let output =
-        Command::new("vasmm68k_mot").arg(filename).output().expect("failed to execute process");
+        Command::new(VASM_EXE)
+            .arg(TEMP_FILE)
+            .arg("-Fbin")
+            .arg("-o")
+            .arg(TEMP_FILE_OUT)
+            .output().expect("failed to execute process");
 
     output.status.success()
 }
