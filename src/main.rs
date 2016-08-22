@@ -169,12 +169,13 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
         // precheck if row needs printed
         let mut skip_count = 0;
 
-        for cycle in cycles {
-            if let &Some(cc) = cycle { }
-            else {                
+        for i in index..index+9 {
+            if let None = cycles[i] {
                 skip_count += 1;
             }
         }
+        
+        //println!("{:?}, index: {:?}", skip_count, index);
 
         if skip_count != 9 {
             print!("| {name:<width$}", name = src.print_name, width = 9);
@@ -194,6 +195,7 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
 
             println!("|");
         }
+        else { index += 9; }
     }
 
     println!("");
