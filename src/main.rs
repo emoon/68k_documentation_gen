@@ -2,6 +2,10 @@ use std::process::Command;
 use std::fs::File;
 use std::io::Write;
 
+pub mod descriptions;
+
+use descriptions::*;
+
 #[cfg(target_os="windows")]
 const VASM_EXE: &'static str = "bin/win/vasmm68k_mot.exe";
 
@@ -73,6 +77,7 @@ impl CycleRule {
 
 struct Instruction<'a> {
     name: &'static str,
+    _desc: Option<Description>,
     cycle_rules: &'a [CycleRule],
 }
 
@@ -275,11 +280,13 @@ fn main() {
     let inst_2_ops_000 = [
         Instruction {
                 name: "abcd",
+                _desc: None,
                 cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
                                 CycleRule::new(6, 10, Ea::Any, Ea::Any)],
         },
         Instruction {
                 name: "add",
+                _desc: Some(ADD_DESC),
                 cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
@@ -288,16 +295,19 @@ fn main() {
         },
         Instruction {
                 name: "addq",
+                _desc: None,
                 cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
         },
         Instruction {
                 name: "addx",
+                _desc: None,
                 cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
                                 CycleRule::new(6, 10, Ea::Any, Ea::Any)],
         },
         Instruction {
                 name: "and",
+                _desc: None,
                 cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
                                 CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
@@ -305,6 +315,7 @@ fn main() {
         },
         Instruction {
                 name: "bchg",
+                _desc: None,
                 cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
                                 CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
         },
@@ -312,6 +323,7 @@ fn main() {
 
     let inst_1_ops_000 = [Instruction {
                               name: "clr",
+                              _desc: None,
                               cycle_rules: &[CycleRule::new(4, 8, Ea::Any, Ea::Any)],
                           }];
 
