@@ -1,3 +1,7 @@
+extern crate rayon;
+
+use rayon::prelude::*;
+
 use std::process::Command;
 use std::fs::File;
 use std::io::Write;
@@ -19,10 +23,10 @@ const VASM_EXE: &'static str = "bin/mac/vasmm68k_mot";
             target_os="openbsd"))]
 const VASM_EXE: &'static str = "vasmm68k_mot";
 
-const TEMP_FILE: &'static str = "target/temp.s";
-const TEMP_FILE_OUT: &'static str = "target/temp.o";
+//const TEMP_FILE: &'static str = "target/temp.s";
+//const TEMP_FILE_OUT: &'static str = "target/temp.o";
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 enum Ea {
     Any,
     Immidate,
@@ -38,6 +42,15 @@ enum Size {
     Long,
 }
 
+struct BuildResult {
+	src: Option<Op>,
+	dst: Op,
+	temp_file: String,
+	temp_out: String,
+	cycle_count: Option<usize>,
+}
+
+#[derive(Copy, Clone)]
 struct Op {
     name: &'static str,
     print_name: &'static str,
@@ -137,24 +150,24 @@ fn calc_cycle_count_one_op(inst: &Instruction, arg: &Op, size: Size) -> usize {
 }
 
 
-fn compile_statement(statement: &str) -> bool {
+fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
     {
-        let mut file = File::create(TEMP_FILE).unwrap();
+        let mut file = File::create(filename).unwrap();
         write!(file, " {}", statement).unwrap();
     }
 
     let output = Command::new(VASM_EXE)
-        .arg(TEMP_FILE)
+        .arg(filename)
         .arg("-Fbin")
         .arg("-o")
-        .arg(TEMP_FILE_OUT)
+        .arg(file_out)
         .output()
         .expect("failed to execute process");
 
     output.status.success()
 }
 
-fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], dest_table: &[Op]) {
+fn print_grid_table(name: &str, cycles: &Vec<BuildResult>, src_table: &[Op], dest_table: &[Op]) {
     print!("| {name:<width$}", name = name, width = 9);
 
     for dst in dest_table {
@@ -170,7 +183,7 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
         let mut skip_count = 0;
 
         for i in index..index + 9 {
-            if let None = cycles[i] {
+            if let None = cycles[i].cycle_count {
                 skip_count += 1;
             }
         }
@@ -179,7 +192,7 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
             print!("| {name:<width$}", name = src.print_name, width = 9);
 
             for dest in dest_table {
-                if let Some(cycle_count) = cycles[index] {
+                if let Some(cycle_count) = cycles[index].cycle_count {
                     print!("|{number:^width$}",
                            number = cycle_count,
                            width = dest.print_name.len() + 2);
@@ -200,7 +213,7 @@ fn print_grid_table(name: &str, cycles: &Vec<Option<usize>>, src_table: &[Op], d
     println!("");
 }
 
-fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
+fn print_table(name: &str, cycles: &Vec<BuildResult>, dest_table: &[Op]) {
     print!("| {name:<width$}", name = name, width = 9);
 
     for dst in dest_table {
@@ -215,7 +228,7 @@ fn print_table(name: &str, cycles: &Vec<Option<usize>>, dest_table: &[Op]) {
     print!("| {name:<width$}", name = " ", width = 9);
 
     for dest in dest_table {
-        if let Some(cycle_count) = cycles[index] {
+        if let Some(cycle_count) = cycles[index].cycle_count {
             print!("|{number:^width$}",
                    number = cycle_count,
                    width = dest.print_name.len() + 2);
@@ -255,32 +268,59 @@ fn generate_table(inst: &Instruction,
                   size: Size,
                   src_table: Option<&[Op]>,
                   dest_table: &[Op]) {
-    let mut cycles = Vec::with_capacity(20 * 20);
+    let mut statements = Vec::with_capacity(20 * 20);
+    let mut count = 0;
 
     if let Some(src_opts) = src_table {
         for src in src_opts {
             for dst in dest_table {
-                let statement = format!("{} {},{}", name, src.name, dst.name);
-                if compile_statement(&statement) {
-                    cycles.push(Some(calculate_cycle_count(inst, &src, &dst, size)));
-                } else {
-                    cycles.push(None);
-                }
+                let file_in = format!("target/temp_{}.s", count);
+                let file_out = format!("target/temp_{}.o", count);
+
+                statements.push(BuildResult {
+                	src: Some(src.clone()),
+                	dst: dst.clone(),
+                	temp_file: file_in,
+                	temp_out: file_out,
+                	cycle_count: None,
+                });
+
+                count += 1;
             }
         }
 
-        print_grid_table(name, &cycles, &src_opts, dest_table);
+        statements.par_iter_mut().weight_max().for_each(|v| {
+        	let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
+        	if compile_statement(&v.temp_file, &v.temp_out, &statement) {
+                v.cycle_count = Some(calculate_cycle_count(inst, &v.src.unwrap(), &v.dst, size));
+        	}
+        });
+
+        print_grid_table(name, &statements, &src_opts, dest_table);
     } else {
         for dst in dest_table {
-            let statement = format!("{} {}", name, dst.name);
-            if compile_statement(&statement) {
-                cycles.push(Some(calc_cycle_count_one_op(inst, &dst, size)));
-            } else {
-                cycles.push(None);
-            }
+			let file_in = format!("target/temp_{}.s", count);
+			let file_out = format!("target/temp_{}.o", count);
+
+			statements.push(BuildResult {
+				src: None,
+				dst: dst.clone(),
+				temp_file: file_in,
+				temp_out: file_out,
+				cycle_count: None,
+			});
+
+			count += 1;
         }
 
-        print_table(name, &cycles, dest_table);
+        statements.par_iter_mut().weight_max().for_each(|v| {
+            let statement = format!("{} {}", name, v.dst.name);
+        	if compile_statement(&v.temp_file, &v.temp_out, &statement) {
+                v.cycle_count = Some(calc_cycle_count_one_op(inst, &v.dst, size));
+        	}
+		});
+
+        print_table(name, &statements, dest_table);
     }
 }
 
@@ -359,7 +399,7 @@ fn main() {
 
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
-        
+
         print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
         generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
