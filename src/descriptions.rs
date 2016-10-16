@@ -2,6 +2,7 @@ pub enum Flag {
     Set(&'static str),
     Clear(&'static str),
     NotAffected(&'static str),
+    Undefined,
 }
 
 pub struct FlagsDesc {
@@ -20,6 +21,14 @@ const FLAGS_ARC: FlagsDesc = FlagsDesc {
     c: Flag::Set("C — Set if a carry is generated; cleared otherwise."),
 };
 
+const FLAGS_ABCD: FlagsDesc = FlagsDesc {
+    x: Flag::Set("X - Set the same as carry"),
+    n: Flag::Undefined,
+    z: Flag::Clear("Z — Cleared if the result is nonzero; unchanged otherwise"),
+    v: Flag::Undefined,
+    c: Flag::Set("C — Set if a decimal carry was generated; cleared otherwise."),
+};
+
 pub struct Description {
     pub description: &'static str,
     pub operation: &'static str,
@@ -36,7 +45,7 @@ pub const ABCD_DESC: Description = Description {
     operation: "Source10 + Destination10 + X → Destination",
     assembler: &["Add < ea > ,Dn", "Add Dn, < ea >"],
     attributes: "Byte, Word, Long",
-    flags: &FLAGS_ALL_SET,
+    flags: &FLAGS_ABCD,
 };
 
 pub const ADD_DESC: Description = Description {
