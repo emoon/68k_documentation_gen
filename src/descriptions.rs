@@ -381,6 +381,14 @@ pub const JMP_DESC: Description = Description {
     flags: &FLAGS_NOT_AFFECTED,
 };
 
+pub const JSR_DESC: Description = Description {
+    description: "Pushes the long-word address of the instruction immediately following the JSR instruction onto the system stack. Program execution then continues at the address specified in the instruction.",
+    operation: "SP – 4 → Sp; PC → (SP); Destination Address → PC",
+    assembler: &["jsr < ea > "],
+    attributes: "Unsized",
+    flags: &FLAGS_NOT_AFFECTED,
+};
+
 pub const LEA_DESC: Description = Description {
     description: "Loads the effective address into the specified address register. All 32 bits of the address register are affected by this instruction.",
     operation: "< ea > → An",

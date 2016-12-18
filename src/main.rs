@@ -215,8 +215,6 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
             inst_count += 1;
         }
     }
-
-    println!("Size buffer {}", instructions.len());
 }
 
 fn generate_table(inst: &Instruction,
@@ -278,6 +276,8 @@ fn generate_table(inst: &Instruction,
             }
         });
 
+        compile_cycle_counts(&mut statements);
+
         print_table(name, &statements, dest_table);
     }
 }
@@ -306,52 +306,159 @@ fn main() {
     Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
     Op::new("#2", "#xxx", 4, Ea::Immidate)];
 
+    let dest_types_none = [Op::new("", "", 0, Ea::Immidate)];
+
     unsafe {
         m68k_wrapper_init();
     }
 
     let inst_2_ops_000 =
-        [/*Instruction {
-           name: "abcd",
-           _desc: None,
-           cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
-           CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-           },*/
+        [
+        Instruction {
+            name: "abcd",
+            _desc: Some(ABCD_DESC),
+        },
+
         Instruction {
             name: "add",
             _desc: Some(ADD_DESC),
-        }/*,
-           Instruction {
-           name: "addq",
-           _desc: None,
-           cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
-           CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
-           },
-           Instruction {
-           name: "addx",
-           _desc: None,
-           cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
-           CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-           },
-           Instruction {
-           name: "and",
-           _desc: None,
-           cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-           CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-           CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-           CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-           },
-           Instruction {
-           name: "bchg",
-           _desc: None,
-           cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
-           CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
-           }*/];
+        },
+        Instruction {
+            name: "addq",
+            _desc: Some(ADDQ_DESC),
+        },
+        Instruction {
+            name: "addx",
+            _desc: Some(ADDX_DESC),
+        },
+        Instruction {
+            name: "and",
+            _desc: Some(AND_DESC),
+        },
+        Instruction {
+            name: "bchg",
+            _desc: Some(BCHG_DESC),
+        },
+        Instruction {
+            name: "bclr",
+            _desc: Some(BCLR_DESC),
+        },
+        Instruction {
+            name: "bset",
+            _desc: Some(BSET_DESC),
+        },
+        Instruction {
+            name: "btst",
+            _desc: Some(BTST_DESC),
+        },
+        Instruction {
+            name: "cmp",
+            _desc: Some(CMP_DESC),
+        },
+        Instruction {
+            name: "divu",
+            _desc: Some(DIVS_DIVU_DESC),
+        },
+        Instruction {
+            name: "divs",
+            _desc: Some(DIVS_DIVU_DESC),
+        },
+        Instruction {
+            name: "eor",
+            _desc: Some(EOR_DESC),
+        },
+        Instruction {
+            name: "exg",
+            _desc: Some(EXG_DESC),
+        },
+        Instruction {
+            name: "lea",
+            _desc: Some(LEA_DESC),
+        },
+        Instruction {
+            name: "move",
+            _desc: Some(MOVE_DESC),
+        },
+        Instruction {
+            name: "muls",
+            _desc: Some(MULS_DESC),
+        },
+        Instruction {
+            name: "mulu",
+            _desc: Some(MULU_DESC),
+        },
+        Instruction {
+            name: "or",
+            _desc: Some(OR_DESC),
+        },
+        Instruction {
+            name: "sub",
+            _desc: Some(SUB_DESC),
+        },
+        Instruction {
+            name: "subq",
+            _desc: Some(SUBQ_DESC),
+        },
+        Instruction {
+            name: "subx",
+            _desc: Some(SUBX_DESC),
+        },
+        ];
 
-    let inst_1_ops_000 = [Instruction {
-        name: "clr",
-        _desc: None,
-    }];
+    let inst_1_ops_000 = [
+        Instruction {
+            name: "clr",
+            _desc: Some(CLR_DESC),
+        },
+        Instruction {
+            name: "ext",
+            _desc: Some(EXT_DESC),
+        },
+        Instruction {
+            name: "bsr",
+            _desc: Some(BSR_DESC),
+        },
+        Instruction {
+            name: "jsr",
+            _desc: Some(JSR_DESC),
+        },
+        Instruction {
+            name: "jmp",
+            _desc: Some(JMP_DESC),
+        },
+        Instruction {
+            name: "neg",
+            _desc: Some(NEG_DESC),
+        },
+        Instruction {
+            name: "not",
+            _desc: Some(NOT_DESC),
+        },
+        Instruction {
+            name: "swap",
+            _desc: Some(SWAP_DESC),
+        },
+        ];
+
+    let inst_0_ops_000 = [
+        Instruction {
+            name: "nop",
+            _desc: Some(NOP_DESC),
+        },
+        Instruction {
+            name: "illegal",
+            _desc: None,
+        },
+        Instruction {
+            name: "rte",
+            _desc: Some(RTS_DESC),
+        },
+        Instruction {
+            name: "rts",
+            _desc: Some(RTS_DESC),
+        },
+    ];
+
 
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
@@ -369,6 +476,16 @@ fn main() {
         print_instruction_header(inst);
         generate_table(&inst, inst.name, Size::Word, None, &dest_types);
         generate_table(&inst, &name_long, Size::Long, None, &dest_types);
+    }
+
+    // Generate instructions with no ops
+
+    for inst in &inst_0_ops_000 {
+        let name_long = format!("{}.l", inst.name);
+
+        print_instruction_header(inst);
+        generate_table(&inst, inst.name, Size::Word, None, &dest_types_none);
+        generate_table(&inst, &name_long, Size::Long, None, &dest_types_none);
     }
 }
 

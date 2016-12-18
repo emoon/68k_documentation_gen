@@ -711,8 +711,8 @@ int m68k_execute_inst_count(int instruction_count, int* cycles)
 		SET_CYCLES(0);
 
 		for (int i = 0; i < 8; ++i) {
-			REG_A[i] = 4;
-			REG_D[i] = 0;
+			REG_A[i] = 8;
+			REG_D[i] = 1;
 		}
 
 		REG_PPC = REG_PC;
