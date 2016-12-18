@@ -5,6 +5,8 @@ use rayon::prelude::*;
 use std::process::Command;
 use std::fs::File;
 use std::io::Write;
+use std::os::raw;
+use std::io::Read;
 
 pub mod descriptions;
 
@@ -17,14 +19,11 @@ const VASM_EXE: &'static str = "bin/win/vasmm68k_mot.exe";
 const VASM_EXE: &'static str = "bin/mac/vasmm68k_mot";
 
 #[cfg(any(target_os="linux",
-            target_os="freebsd",
-            target_os="dragonfly",
-            target_os="netbsd",
-            target_os="openbsd"))]
+          target_os="freebsd",
+          target_os="dragonfly",
+          target_os="netbsd",
+          target_os="openbsd"))]
 const VASM_EXE: &'static str = "vasmm68k_mot";
-
-//const TEMP_FILE: &'static str = "target/temp.s";
-//const TEMP_FILE_OUT: &'static str = "target/temp.o";
 
 #[derive(PartialEq, Clone, Copy)]
 enum Ea {
@@ -43,11 +42,11 @@ enum Size {
 }
 
 struct BuildResult {
-	src: Option<Op>,
-	dst: Op,
-	temp_file: String,
-	temp_out: String,
-	cycle_count: Option<usize>,
+    src: Option<Op>,
+    dst: Op,
+    temp_file: String,
+    temp_out: String,
+    cycle_count: Option<usize>,
 }
 
 #[derive(Copy, Clone)]
@@ -68,85 +67,9 @@ impl Op {
         }
     }
 }
-
-#[derive(Clone)]
-struct CycleRule {
-    word_count: usize,
-    long_count: usize,
-    source: Ea,
-    dest: Ea,
-}
-
-impl CycleRule {
-    fn new(word_count: usize, long_count: usize, source: Ea, dest: Ea) -> CycleRule {
-        CycleRule {
-            word_count: word_count,
-            long_count: long_count,
-            source: source,
-            dest: dest,
-        }
-    }
-}
-
-struct Instruction<'a> {
+struct Instruction {
     name: &'static str,
     _desc: Option<Description>,
-    cycle_rules: &'a [CycleRule],
-}
-
-fn calculate_cycle_count(inst: &Instruction, src: &Op, dest: &Op, size: Size) -> usize {
-    let mut cycle_count = 0;
-
-    for rule in inst.cycle_rules {
-        if (src.ea_type == rule.source || rule.source == Ea::Any) &&
-           (dest.ea_type == rule.dest || rule.dest == Ea::Any) {
-            match size {
-                Size::Word => cycle_count = rule.word_count,
-                Size::Long => cycle_count = rule.long_count,
-                _ => panic!("Not supported!"),
-            }
-            break;
-        }
-    }
-
-    cycle_count += src.count + dest.count;
-
-    if size == Size::Long {
-        if src.count != 0 {
-            cycle_count += 4;
-        }
-
-        if dest.count != 0 {
-            cycle_count += 4;
-        }
-    }
-
-    cycle_count
-}
-
-fn calc_cycle_count_one_op(inst: &Instruction, arg: &Op, size: Size) -> usize {
-    let mut cycle_count = 0;
-
-    for rule in inst.cycle_rules {
-        if arg.ea_type == rule.dest || rule.dest == Ea::Any {
-            match size {
-                Size::Word => cycle_count = rule.word_count,
-                Size::Long => cycle_count = rule.long_count,
-                _ => panic!("Not supported!"),
-            }
-            break;
-        }
-    }
-
-    cycle_count += arg.count;
-
-    if size == Size::Long {
-        if arg.count != 0 {
-            cycle_count += 4;
-        }
-    }
-
-    cycle_count
 }
 
 
@@ -263,6 +186,37 @@ fn print_instruction_header(inst: &Instruction) {
     }
 }
 
+fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
+    let mut instructions = Vec::new();
+    let mut inst_count = 0u32;
+    let mut cycle_count = Vec::<u32>::new();
+
+    for statement in statements.iter() {
+        if statement.cycle_count.is_some() {
+            {
+                let mut f = File::open(&statement.temp_out).unwrap();
+                f.read_to_end(&mut instructions).unwrap();
+                cycle_count.push(0);
+                inst_count += 1;
+            }
+        }
+    }
+
+
+    unsafe {
+        m68k_run_instructions(instructions.as_ptr() as *const raw::c_void, inst_count, cycle_count.as_mut_ptr());
+    }
+
+    inst_count = 0;
+
+    for statement in statements.iter_mut() {
+        if statement.cycle_count.is_some() {
+            statement.cycle_count = Some(cycle_count[inst_count as usize] as usize);
+            inst_count += 1;
+        }
+    }
+}
+
 fn generate_table(inst: &Instruction,
                   name: &str,
                   size: Size,
@@ -278,11 +232,11 @@ fn generate_table(inst: &Instruction,
                 let file_out = format!("target/temp_{}.o", count);
 
                 statements.push(BuildResult {
-                	src: Some(src.clone()),
-                	dst: dst.clone(),
-                	temp_file: file_in,
-                	temp_out: file_out,
-                	cycle_count: None,
+                    src: Some(src.clone()),
+                    dst: dst.clone(),
+                    temp_file: file_in,
+                    temp_out: file_out,
+                    cycle_count: None,
                 });
 
                 count += 1;
@@ -290,35 +244,39 @@ fn generate_table(inst: &Instruction,
         }
 
         statements.par_iter_mut().weight_max().for_each(|v| {
-        	let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
-        	if compile_statement(&v.temp_file, &v.temp_out, &statement) {
-                v.cycle_count = Some(calculate_cycle_count(inst, &v.src.unwrap(), &v.dst, size));
-        	}
+            let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
+            if compile_statement(&v.temp_file, &v.temp_out, &statement) {
+                v.cycle_count = Some(0); // indicate that this should be processed
+            }
         });
+
+        compile_cycle_counts(&mut statements);
 
         print_grid_table(name, &statements, &src_opts, dest_table);
     } else {
         for dst in dest_table {
-			let file_in = format!("target/temp_{}.s", count);
-			let file_out = format!("target/temp_{}.o", count);
+            let file_in = format!("target/temp_{}.s", count);
+            let file_out = format!("target/temp_{}.o", count);
 
-			statements.push(BuildResult {
-				src: None,
-				dst: dst.clone(),
-				temp_file: file_in,
-				temp_out: file_out,
-				cycle_count: None,
-			});
+            statements.push(BuildResult {
+                src: None,
+                dst: dst.clone(),
+                temp_file: file_in,
+                temp_out: file_out,
+                cycle_count: None,
+            });
 
-			count += 1;
+            count += 1;
         }
 
         statements.par_iter_mut().weight_max().for_each(|v| {
             let statement = format!("{} {}", name, v.dst.name);
-        	if compile_statement(&v.temp_file, &v.temp_out, &statement) {
-                v.cycle_count = Some(calc_cycle_count_one_op(inst, &v.dst, size));
-        	}
-		});
+            if compile_statement(&v.temp_file, &v.temp_out, &statement) {
+                v.cycle_count = Some(0);
+            }
+        });
+
+        compile_cycle_counts(&mut statements);
 
         print_table(name, &statements, dest_table);
     }
@@ -326,76 +284,181 @@ fn generate_table(inst: &Instruction,
 
 fn main() {
     let dest_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
-                      Op::new("a0", "An", 0, Ea::AddressRegister),
-                      Op::new("(a0)", "(An)", 4, Ea::Memory),
-                      Op::new("(a0)+", "(An)+", 4, Ea::Memory),
-                      Op::new("-(a0)", "-(An)", 6, Ea::Memory),
-                      Op::new("2(a0)", "d(An)", 8, Ea::Memory),
-                      Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
-                      Op::new("$4.W", "xxx.W", 8, Ea::Memory),
-                      Op::new("$4.L", "xxx.L", 12, Ea::Memory)];
+    Op::new("a0", "An", 0, Ea::AddressRegister),
+    Op::new("(a0)", "(An)", 4, Ea::Memory),
+    Op::new("(a0)+", "(An)+", 4, Ea::Memory),
+    Op::new("-(a0)", "-(An)", 6, Ea::Memory),
+    Op::new("2(a0)", "d(An)", 8, Ea::Memory),
+    Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
+    Op::new("$4.W", "xxx.W", 8, Ea::Memory),
+    Op::new("$4.L", "xxx.L", 12, Ea::Memory)];
 
     let src_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
-                     Op::new("a0", "An", 0, Ea::AddressRegister),
-                     Op::new("(a0)", "(An)", 4, Ea::Memory),
-                     Op::new("(a0)+", "(An)+", 4, Ea::Memory),
-                     Op::new("-(a0)", "-(An)", 6, Ea::Memory),
-                     Op::new("2(a0)", "d(An)", 8, Ea::Memory),
-                     Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
-                     Op::new("$4.W", "xxx.W", 8, Ea::Memory),
-                     Op::new("$4.L", "xxx.L", 12, Ea::Memory),
-                     Op::new("2(pc)", "d(PC)", 8, Ea::Memory),
-                     Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
-                     Op::new("#2", "#xxx", 4, Ea::Immidate)];
+    Op::new("a0", "An", 0, Ea::AddressRegister),
+    Op::new("(a0)", "(An)", 4, Ea::Memory),
+    Op::new("(a0)+", "(An)+", 4, Ea::Memory),
+    Op::new("-(a0)", "-(An)", 6, Ea::Memory),
+    Op::new("2(a0)", "d(An)", 8, Ea::Memory),
+    Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
+    Op::new("$4.W", "xxx.W", 8, Ea::Memory),
+    Op::new("$4.L", "xxx.L", 12, Ea::Memory),
+    Op::new("2(pc)", "d(PC)", 8, Ea::Memory),
+    Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
+    Op::new("#2", "#xxx", 4, Ea::Immidate)];
+
+    let dest_types_none = [Op::new("", "", 0, Ea::Immidate)];
+
+    unsafe {
+        m68k_wrapper_init();
+    }
 
     let inst_2_ops_000 =
-        [/*Instruction {
-             name: "abcd",
-             _desc: None,
-             cycle_rules: &[CycleRule::new(6, 6, Ea::DataRegister, Ea::DataRegister),
-                            CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-         },*/
-         Instruction {
-             name: "add",
-             _desc: Some(ADD_DESC),
-             cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                            CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                            CycleRule::new(8, 8, Ea::Any, Ea::AddressRegister),
-                            CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                            CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-         }/*,
-         Instruction {
-             name: "addq",
-             _desc: None,
-             cycle_rules: &[CycleRule::new(0, 0, Ea::Immidate, Ea::DataRegister),
-                            CycleRule::new(4, 4, Ea::Immidate, Ea::Memory)],
-         },
-         Instruction {
-             name: "addx",
-             _desc: None,
-             cycle_rules: &[CycleRule::new(4, 8, Ea::DataRegister, Ea::DataRegister),
-                            CycleRule::new(6, 10, Ea::Any, Ea::Any)],
-         },
-         Instruction {
-             name: "and",
-             _desc: None,
-             cycle_rules: &[CycleRule::new(4, 8, Ea::Immidate, Ea::DataRegister),
-                            CycleRule::new(8, 8, Ea::Immidate, Ea::Memory),
-                            CycleRule::new(4, 6, Ea::Any, Ea::DataRegister),
-                            CycleRule::new(8, 12, Ea::DataRegister, Ea::Memory)],
-         },
-         Instruction {
-             name: "bchg",
-             _desc: None,
-             cycle_rules: &[CycleRule::new(8, 12, Ea::Immidate, Ea::Memory),
-                            CycleRule::new(8, 8, Ea::DataRegister, Ea::Any)],
-         }*/];
+        [
+        Instruction {
+            name: "abcd",
+            _desc: Some(ABCD_DESC),
+        },
 
-    let inst_1_ops_000 = [Instruction {
-                              name: "clr",
-                              _desc: None,
-                              cycle_rules: &[CycleRule::new(4, 8, Ea::Any, Ea::Any)],
-                          }];
+        Instruction {
+            name: "add",
+            _desc: Some(ADD_DESC),
+        },
+        Instruction {
+            name: "addq",
+            _desc: Some(ADDQ_DESC),
+        },
+        Instruction {
+            name: "addx",
+            _desc: Some(ADDX_DESC),
+        },
+        Instruction {
+            name: "and",
+            _desc: Some(AND_DESC),
+        },
+        Instruction {
+            name: "bchg",
+            _desc: Some(BCHG_DESC),
+        },
+        Instruction {
+            name: "bclr",
+            _desc: Some(BCLR_DESC),
+        },
+        Instruction {
+            name: "bset",
+            _desc: Some(BSET_DESC),
+        },
+        Instruction {
+            name: "btst",
+            _desc: Some(BTST_DESC),
+        },
+        Instruction {
+            name: "cmp",
+            _desc: Some(CMP_DESC),
+        },
+        Instruction {
+            name: "divu",
+            _desc: Some(DIVS_DIVU_DESC),
+        },
+        Instruction {
+            name: "divs",
+            _desc: Some(DIVS_DIVU_DESC),
+        },
+        Instruction {
+            name: "eor",
+            _desc: Some(EOR_DESC),
+        },
+        Instruction {
+            name: "exg",
+            _desc: Some(EXG_DESC),
+        },
+        Instruction {
+            name: "lea",
+            _desc: Some(LEA_DESC),
+        },
+        Instruction {
+            name: "move",
+            _desc: Some(MOVE_DESC),
+        },
+        Instruction {
+            name: "muls",
+            _desc: Some(MULS_DESC),
+        },
+        Instruction {
+            name: "mulu",
+            _desc: Some(MULU_DESC),
+        },
+        Instruction {
+            name: "or",
+            _desc: Some(OR_DESC),
+        },
+        Instruction {
+            name: "sub",
+            _desc: Some(SUB_DESC),
+        },
+        Instruction {
+            name: "subq",
+            _desc: Some(SUBQ_DESC),
+        },
+        Instruction {
+            name: "subx",
+            _desc: Some(SUBX_DESC),
+        },
+        ];
+
+    let inst_1_ops_000 = [
+        Instruction {
+            name: "clr",
+            _desc: Some(CLR_DESC),
+        },
+        Instruction {
+            name: "ext",
+            _desc: Some(EXT_DESC),
+        },
+        Instruction {
+            name: "bsr",
+            _desc: Some(BSR_DESC),
+        },
+        Instruction {
+            name: "jsr",
+            _desc: Some(JSR_DESC),
+        },
+        Instruction {
+            name: "jmp",
+            _desc: Some(JMP_DESC),
+        },
+        Instruction {
+            name: "neg",
+            _desc: Some(NEG_DESC),
+        },
+        Instruction {
+            name: "not",
+            _desc: Some(NOT_DESC),
+        },
+        Instruction {
+            name: "swap",
+            _desc: Some(SWAP_DESC),
+        },
+        ];
+
+    let inst_0_ops_000 = [
+        Instruction {
+            name: "nop",
+            _desc: Some(NOP_DESC),
+        },
+        Instruction {
+            name: "illegal",
+            _desc: None,
+        },
+        Instruction {
+            name: "rte",
+            _desc: Some(RTS_DESC),
+        },
+        Instruction {
+            name: "rts",
+            _desc: Some(RTS_DESC),
+        },
+    ];
+
 
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
@@ -414,4 +477,21 @@ fn main() {
         generate_table(&inst, inst.name, Size::Word, None, &dest_types);
         generate_table(&inst, &name_long, Size::Long, None, &dest_types);
     }
+
+    // Generate instructions with no ops
+
+    for inst in &inst_0_ops_000 {
+        let name_long = format!("{}.l", inst.name);
+
+        print_instruction_header(inst);
+        generate_table(&inst, inst.name, Size::Word, None, &dest_types_none);
+        generate_table(&inst, &name_long, Size::Long, None, &dest_types_none);
+    }
 }
+
+extern "C" {
+    fn m68k_wrapper_init();
+    fn m68k_run_instructions(instructions: *const raw::c_void, count: u32, cycle_res: *mut u32);
+}
+
+
