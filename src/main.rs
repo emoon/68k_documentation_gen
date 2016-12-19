@@ -25,22 +25,6 @@ const VASM_EXE: &'static str = "bin/mac/vasmm68k_mot";
           target_os="openbsd"))]
 const VASM_EXE: &'static str = "vasmm68k_mot";
 
-#[derive(PartialEq, Clone, Copy)]
-enum Ea {
-    Any,
-    Immidate,
-    DataRegister,
-    AddressRegister,
-    Memory,
-}
-
-#[derive(PartialEq, Copy, Clone)]
-enum Size {
-    _Byte,
-    Word,
-    Long,
-}
-
 struct BuildResult {
     src: Option<Op>,
     dst: Op,
@@ -53,17 +37,13 @@ struct BuildResult {
 struct Op {
     name: &'static str,
     print_name: &'static str,
-    count: usize,
-    ea_type: Ea,
 }
 
 impl Op {
-    fn new(name: &'static str, print_name: &'static str, count: usize, ea_type: Ea) -> Op {
+    fn new(name: &'static str, print_name: &'static str) -> Op {
         Op {
             name: name,
             print_name: print_name,
-            count: count,
-            ea_type: ea_type,
         }
     }
 }
@@ -71,7 +51,6 @@ struct Instruction {
     name: &'static str,
     _desc: Option<Description>,
 }
-
 
 fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
     {
@@ -217,9 +196,7 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
     }
 }
 
-fn generate_table(inst: &Instruction,
-                  name: &str,
-                  size: Size,
+fn generate_table(name: &str,
                   src_table: Option<&[Op]>,
                   dest_table: &[Op]) {
     let mut statements = Vec::with_capacity(20 * 20);
@@ -283,30 +260,32 @@ fn generate_table(inst: &Instruction,
 }
 
 fn main() {
-    let dest_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
-    Op::new("a0", "An", 0, Ea::AddressRegister),
-    Op::new("(a0)", "(An)", 4, Ea::Memory),
-    Op::new("(a0)+", "(An)+", 4, Ea::Memory),
-    Op::new("-(a0)", "-(An)", 6, Ea::Memory),
-    Op::new("2(a0)", "d(An)", 8, Ea::Memory),
-    Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
-    Op::new("$4.W", "xxx.W", 8, Ea::Memory),
-    Op::new("$4.L", "xxx.L", 12, Ea::Memory)];
+    let dest_types = [
+        Op::new("d0", "Dn"),
+        Op::new("a0", "An"),
+        Op::new("(a0)", "(An)"),
+        Op::new("(a0)+", "(An)+"),
+        Op::new("-(a0)", "-(An)"),
+        Op::new("2(a0)", "d(An)"),
+        Op::new("2(a0,d0)", "d(An,Dn)"),
+        Op::new("$4.W", "xxx.W"),
+        Op::new("$4.L", "xxx.L")];
 
-    let src_types = [Op::new("d0", "Dn", 0, Ea::DataRegister),
-    Op::new("a0", "An", 0, Ea::AddressRegister),
-    Op::new("(a0)", "(An)", 4, Ea::Memory),
-    Op::new("(a0)+", "(An)+", 4, Ea::Memory),
-    Op::new("-(a0)", "-(An)", 6, Ea::Memory),
-    Op::new("2(a0)", "d(An)", 8, Ea::Memory),
-    Op::new("2(a0,d0)", "d(An,Dn)", 10, Ea::Memory),
-    Op::new("$4.W", "xxx.W", 8, Ea::Memory),
-    Op::new("$4.L", "xxx.L", 12, Ea::Memory),
-    Op::new("2(pc)", "d(PC)", 8, Ea::Memory),
-    Op::new("2(pc,d0)", "d(PC,Dn)", 10, Ea::Memory),
-    Op::new("#2", "#xxx", 4, Ea::Immidate)];
+    let src_types = [
+        Op::new("d0", "Dn"),
+        Op::new("a0", "An"),
+        Op::new("(a0)", "(An)"),
+        Op::new("(a0)+", "(An)+"),
+        Op::new("-(a0)", "-(An)"),
+        Op::new("2(a0)", "d(An)"),
+        Op::new("2(a0,d0)", "d(An,Dn)"),
+        Op::new("$4.W", "xxx.W"),
+        Op::new("$4.L", "xxx.L"),
+        Op::new("2(pc)", "d(PC)"),
+        Op::new("2(pc,d0)", "d(PC,Dn)"),
+        Op::new("#2", "#xxx")];
 
-    let dest_types_none = [Op::new("", "", 0, Ea::Immidate)];
+    let dest_types_none = [Op::new("", "")];
 
     unsafe {
         m68k_wrapper_init();
@@ -464,8 +443,8 @@ fn main() {
         let name_long = format!("{}.l", inst.name);
 
         print_instruction_header(inst);
-        generate_table(&inst, inst.name, Size::Word, Some(&src_types), &dest_types);
-        generate_table(&inst, &name_long, Size::Long, Some(&src_types), &dest_types);
+        generate_table(inst.name, Some(&src_types), &dest_types);
+        generate_table(&name_long, Some(&src_types), &dest_types);
     }
 
     // Generate instructions with one op
@@ -474,9 +453,11 @@ fn main() {
         let name_long = format!("{}.l", inst.name);
 
         print_instruction_header(inst);
-        generate_table(&inst, inst.name, Size::Word, None, &dest_types);
-        generate_table(&inst, &name_long, Size::Long, None, &dest_types);
+        generate_table(inst.name, None, &dest_types);
+        generate_table(&name_long, None, &dest_types);
     }
+
+    //
 
     // Generate instructions with no ops
 
@@ -484,8 +465,8 @@ fn main() {
         let name_long = format!("{}.l", inst.name);
 
         print_instruction_header(inst);
-        generate_table(&inst, inst.name, Size::Word, None, &dest_types_none);
-        generate_table(&inst, &name_long, Size::Long, None, &dest_types_none);
+        generate_table(inst.name, None, &dest_types_none);
+        generate_table(&name_long, None, &dest_types_none);
     }
 }
 
