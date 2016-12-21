@@ -139,4 +139,13 @@ void m68k_run_instructions(void* data, int inst_count, int* cycle_result)
 	g_rom = data;
 	m68k_pulse_reset();
 	m68k_execute_inst_count(inst_count, cycle_result);
+	/*
+	int pc = 0;
+
+	for (int i = 0; i < inst_count; ++i) {
+		char buff[100];
+		pc += m68k_disassemble(buff, pc, M68K_CPU_TYPE_68000);
+		printf("inst %04d - %s - %d\n", i, buff, pc);
+	}
+	*/
 }
