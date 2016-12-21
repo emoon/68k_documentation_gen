@@ -84,6 +84,11 @@
 #endif /* M68K_USE_64_BIT */
 
 
+#ifdef _WIN32
+#undef INLINE
+#define INLINE __forceinline
+#endif
+
 
 /* Allow for architectures that don't have 8-bit sizes */
 #if UCHAR_MAX == 0xff
