@@ -49,7 +49,7 @@ impl Op {
 }
 struct Instruction {
     name: &'static str,
-    _desc: Option<Description>,
+    desc: Option<Description>,
 }
 
 fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
@@ -151,7 +151,7 @@ fn print_table(name: &str, cycles: &Vec<BuildResult>, dest_table: &[Op]) {
 fn print_instruction_header(inst: &Instruction) {
     let name = inst.name.to_uppercase();
     println!("## {}\n", name);
-    if let Some(ref desc) = inst._desc {
+    if let Some(ref desc) = inst.desc {
         println!("**Operation:**      {}\n", desc.operation);
 
         print!("**Assembler:** ");
@@ -307,146 +307,146 @@ fn main() {
         [
         Instruction {
             name: "abcd",
-            _desc: Some(ABCD_DESC),
+            desc: Some(ABCD_DESC),
         },
 
         Instruction {
             name: "add",
-            _desc: Some(ADD_DESC),
+            desc: Some(ADD_DESC),
         },
         Instruction {
             name: "addq",
-            _desc: Some(ADDQ_DESC),
+            desc: Some(ADDQ_DESC),
         },
         Instruction {
             name: "addx",
-            _desc: Some(ADDX_DESC),
+            desc: Some(ADDX_DESC),
         },
         Instruction {
             name: "and",
-            _desc: Some(AND_DESC),
+            desc: Some(AND_DESC),
         },
         Instruction {
             name: "bchg",
-            _desc: Some(BCHG_DESC),
+            desc: Some(BCHG_DESC),
         },
         Instruction {
             name: "bclr",
-            _desc: Some(BCLR_DESC),
+            desc: Some(BCLR_DESC),
         },
         Instruction {
             name: "bset",
-            _desc: Some(BSET_DESC),
+            desc: Some(BSET_DESC),
         },
         Instruction {
             name: "btst",
-            _desc: Some(BTST_DESC),
+            desc: Some(BTST_DESC),
         },
         Instruction {
             name: "cmp",
-            _desc: Some(CMP_DESC),
+            desc: Some(CMP_DESC),
         },
         Instruction {
             name: "divu",
-            _desc: Some(DIVS_DIVU_DESC),
+            desc: Some(DIVS_DIVU_DESC),
         },
         Instruction {
             name: "divs",
-            _desc: Some(DIVS_DIVU_DESC),
+            desc: Some(DIVS_DIVU_DESC),
         },
         Instruction {
             name: "eor",
-            _desc: Some(EOR_DESC),
+            desc: Some(EOR_DESC),
         },
         Instruction {
             name: "exg",
-            _desc: Some(EXG_DESC),
+            desc: Some(EXG_DESC),
         },
         Instruction {
             name: "lea",
-            _desc: Some(LEA_DESC),
+            desc: Some(LEA_DESC),
         },
         Instruction {
             name: "move",
-            _desc: Some(MOVE_DESC),
+            desc: Some(MOVE_DESC),
         },
         Instruction {
             name: "muls",
-            _desc: Some(MULS_DESC),
+            desc: Some(MULS_DESC),
         },
         Instruction {
             name: "mulu",
-            _desc: Some(MULU_DESC),
+            desc: Some(MULU_DESC),
         },
         Instruction {
             name: "or",
-            _desc: Some(OR_DESC),
+            desc: Some(OR_DESC),
         },
         Instruction {
             name: "sub",
-            _desc: Some(SUB_DESC),
+            desc: Some(SUB_DESC),
         },
         Instruction {
             name: "subq",
-            _desc: Some(SUBQ_DESC),
+            desc: Some(SUBQ_DESC),
         },
         Instruction {
             name: "subx",
-            _desc: Some(SUBX_DESC),
+            desc: Some(SUBX_DESC),
         },
         ];
 
     let inst_1_ops_000 = [
         Instruction {
             name: "clr",
-            _desc: Some(CLR_DESC),
+            desc: Some(CLR_DESC),
         },
         Instruction {
             name: "ext",
-            _desc: Some(EXT_DESC),
+            desc: Some(EXT_DESC),
         },
         Instruction {
             name: "bsr",
-            _desc: Some(BSR_DESC),
+            desc: Some(BSR_DESC),
         },
         Instruction {
             name: "jsr",
-            _desc: Some(JSR_DESC),
+            desc: Some(JSR_DESC),
         },
         Instruction {
             name: "jmp",
-            _desc: Some(JMP_DESC),
+            desc: Some(JMP_DESC),
         },
         Instruction {
             name: "neg",
-            _desc: Some(NEG_DESC),
+            desc: Some(NEG_DESC),
         },
         Instruction {
             name: "not",
-            _desc: Some(NOT_DESC),
+            desc: Some(NOT_DESC),
         },
         Instruction {
             name: "swap",
-            _desc: Some(SWAP_DESC),
+            desc: Some(SWAP_DESC),
         },
         ];
 
     let inst_0_ops_000 = [
         Instruction {
             name: "nop",
-            _desc: Some(NOP_DESC),
+            desc: Some(NOP_DESC),
         },
         Instruction {
             name: "illegal",
-            _desc: None,
+            desc: None,
         },
         Instruction {
             name: "rte",
-            _desc: Some(RTS_DESC),
+            desc: Some(RTS_DESC),
         },
         Instruction {
             name: "rts",
-            _desc: Some(RTS_DESC),
+            desc: Some(RTS_DESC),
         },
     ];
 
