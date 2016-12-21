@@ -59,6 +59,8 @@ fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
     }
 
     let output = Command::new(VASM_EXE)
+        .arg("-no-opt")
+        .arg("-m68000")
         .arg(filename)
         .arg("-Fbin")
         .arg("-o")
@@ -197,6 +199,7 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
 }
 
 fn generate_table(name: &str,
+                  is_long: bool,
                   src_table: Option<&[Op]>,
                   dest_table: &[Op]) {
     let mut statements = Vec::with_capacity(20 * 20);
@@ -221,7 +224,16 @@ fn generate_table(name: &str,
         }
 
         statements.par_iter_mut().weight_max().for_each(|v| {
-            let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
+            let src = v.src.unwrap();
+            let statement;
+
+            if src.print_name == "#xxx" && is_long {
+                statement = format!("{} {},{}", name, "#$ffffff", v.dst.name);
+            } else {
+                statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
+            }
+            
+            //println!("Statement {}", statement);
             if compile_statement(&v.temp_file, &v.temp_out, &statement) {
                 v.cycle_count = Some(0); // indicate that this should be processed
             }
@@ -283,7 +295,7 @@ fn main() {
         Op::new("$4.L", "xxx.L"),
         Op::new("2(pc)", "d(PC)"),
         Op::new("2(pc,d0)", "d(PC,Dn)"),
-        Op::new("#2", "#xxx")];
+        Op::new("#2000", "#xxx")];
 
     let dest_types_none = [Op::new("", "")];
 
@@ -443,12 +455,13 @@ fn main() {
         let name_long = format!("{}.l", inst.name);
 
         print_instruction_header(inst);
-        generate_table(inst.name, Some(&src_types), &dest_types);
-        generate_table(&name_long, Some(&src_types), &dest_types);
+        generate_table(inst.name, false, Some(&src_types), &dest_types);
+        generate_table(&name_long, true, Some(&src_types), &dest_types);
     }
 
     // Generate instructions with one op
 
+    /*
     for inst in &inst_1_ops_000 {
         let name_long = format!("{}.l", inst.name);
 
@@ -468,6 +481,7 @@ fn main() {
         generate_table(inst.name, None, &dest_types_none);
         generate_table(&name_long, None, &dest_types_none);
     }
+    */
 }
 
 extern "C" {
