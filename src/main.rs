@@ -89,7 +89,7 @@ fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
 
     let output = Command::new(VASM_EXE)
         .arg("-no-opt")
-//        .arg("-m68000")
+        .arg("-m68000")
         .arg(filename)
         .arg("-Fbin")
         .arg("-o")
@@ -192,7 +192,57 @@ fn print_table(name: &str, cycles: &Vec<BuildResult>, dest_table: &[Op]) {
     println!("");
 }
 
-fn print_cc_codes(table: &[&[&'static str]]) {
+fn check_affected(flag_desc: &FlagsDesc) -> bool {
+    flag_desc.x.is_affected() &&
+    flag_desc.n.is_affected() &&
+    flag_desc.z.is_affected() &&
+    flag_desc.v.is_affected() &&
+    flag_desc.c.is_affected()
+}
+
+fn get_flag_status(flag: &Flag) -> &'static str {
+    match *flag {
+        Flag::Set(_) => "*",
+        Flag::Clear(_) => "0",
+        Flag::NotAffected(_) => "-",
+        Flag::Undefined => "U",
+    }
+}
+
+fn print_flag_desc(name: &str, flag: &Flag) {
+    match *flag {
+        Flag::Set(text) => println!("{}  ", text),
+        Flag::Clear(text) => println!("{}  ", text),
+        Flag::NotAffected(text) => println!("{}  ", text),
+        Flag::Undefined => println!("{} — Undefined  ", name),
+    }
+}
+
+fn print_cc_codes(flag_desc: &FlagsDesc) {
+    println!("### Condition Codes:\n");
+
+    if !check_affected(flag_desc) {
+        println!("Not affected.\n");
+        return;
+    }
+
+    println!("| X | N | Z | V | C |");
+    println!("|---|---|---|---|---|");
+    println!("| {} | {} | {} | {} | {} |",
+             get_flag_status(&flag_desc.x), get_flag_status(&flag_desc.n),
+             get_flag_status(&flag_desc.z), get_flag_status(&flag_desc.v),
+             get_flag_status(&flag_desc.c));
+
+    print_flag_desc("X", &flag_desc.x);
+    print_flag_desc("N", &flag_desc.n);
+    print_flag_desc("Z", &flag_desc.z);
+    print_flag_desc("V", &flag_desc.v);
+    print_flag_desc("C", &flag_desc.c);
+
+    println!("");
+}
+
+fn print_condition_codes(table: &[&[&'static str]]) {
     // it's assumed the first row is the header and name is the first entry always
 
     let mut title_row_lengths = Vec::new();
@@ -207,7 +257,7 @@ fn print_cc_codes(table: &[&[&'static str]]) {
     for entry in title_row {
         print!("|");
 
-        for c in entry.chars() {
+        for _ in entry.chars() {
             print!("-")
         }
 
@@ -277,10 +327,12 @@ fn print_instruction_header(inst: &Instruction) {
         println!("**Description:** {}\n", desc.description);
 
         if let Some(cc_codes) = inst.cc_codes {
-            print_cc_codes(cc_codes);
+            print_condition_codes(cc_codes);
         }
 
-        println!("### Instruction Execution Times");
+        print_cc_codes(inst.desc.as_ref().unwrap().flags);
+
+        println!("### Instruction Execution Times:");
     }
     else {
         println!("__No Description__\n");
@@ -317,7 +369,7 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
     }
 }
 
-fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -> Vec<BuildResult> {
+fn generate_statements_two_args(name: &str, inst: &Instruction) -> Vec<BuildResult> {
     let mut statements = Vec::with_capacity(20 * 20);
     let mut count = 0;
 
@@ -341,7 +393,6 @@ fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -
     }
 
     statements.par_iter_mut().weight_max().for_each(|v| {
-        let src = v.src.unwrap();
         let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
         if compile_statement(&v.temp_file, &v.temp_out, &statement) {
             v.cycle_count = Some(0); // indicate that this should be processed
@@ -351,7 +402,7 @@ fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -
     statements
 }
 
-fn generate_statements_one_arg(name: &str, inst: &Instruction, is_long: bool) -> Vec<BuildResult> {
+fn generate_statements_one_arg(name: &str, inst: &Instruction) -> Vec<BuildResult> {
     let mut statements = Vec::with_capacity(20 * 20);
     let mut count = 0;
 
@@ -419,14 +470,14 @@ fn print_predef_table(name: &str, table: &[&[&'static str]]) {
 
     title_row_lengths.push(name.len());
 
-    for c in name.chars() {
+    for _ in name.chars() {
         print!("-")
     }
 
     for entry in title_row {
         print!("|");
 
-        for c in entry.chars() {
+        for _ in entry.chars() {
             print!("-")
         }
 
@@ -448,7 +499,7 @@ fn print_predef_table(name: &str, table: &[&[&'static str]]) {
     println!("");
 }
 
-fn generate_table_2(name: &str, inst: &Instruction, is_long: bool) {
+fn generate_table_2(name: &str, inst: &Instruction) {
     let matrix = inst.matrix.unwrap();
     let mut statements;
 
@@ -470,15 +521,16 @@ fn generate_table_2(name: &str, inst: &Instruction, is_long: bool) {
     }
 
     if matrix.len() == 2 {
-        statements = generate_statements_two_args(name, inst, is_long);
+        statements = generate_statements_two_args(name, inst);
         compile_cycle_counts(&mut statements);
         print_grid_table(name, &statements, matrix[0], matrix[1]);
     } else if matrix.len() == 1 {
-        statements = generate_statements_one_arg(name, inst, is_long);
+        statements = generate_statements_one_arg(name, inst);
         compile_cycle_counts(&mut statements);
         print_table(name, &statements, matrix[0]);
     } else {
         statements = generate_statements_no_args(name);
+        compile_cycle_counts(&mut statements);
     }
 }
 
@@ -592,7 +644,7 @@ fn main() {
             desc: Some(BCC_DESC),
             matrix: Some(one_op),
             cc_codes: Some(&cc_codes),
-            override_output_w: Some(&shift_desc),
+            override_output_w: Some(&bcc_desc),
             .. Instruction::default()
         },
         Instruction {
@@ -773,10 +825,10 @@ fn main() {
         let name_long = format!("{}.l", inst.name);
 
         print_instruction_header(inst);
-        generate_table_2(inst.name, &inst, false);
+        generate_table_2(inst.name, &inst);
 
         if !inst.has_override() {
-            generate_table_2(&name_long, &inst, true);
+            generate_table_2(&name_long, &inst);
         }
 
         //generate_table(inst.name, false, Some(&src_types), &dest_types);

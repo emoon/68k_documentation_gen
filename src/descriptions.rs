@@ -1,8 +1,18 @@
+#[derive(PartialEq)]
 pub enum Flag {
     Set(&'static str),
     Clear(&'static str),
     NotAffected(&'static str),
     Undefined,
+}
+
+impl Flag {
+    pub fn is_affected(&self) -> bool {
+        match *self {
+            Flag::NotAffected(&_) => false,
+            _ => true,
+        }
+    }
 }
 
 pub struct FlagsDesc {
@@ -14,16 +24,16 @@ pub struct FlagsDesc {
 }
 
 const FLAGS_ARC: FlagsDesc = FlagsDesc {
-    x: Flag::Set("X - Set the same as carry"),
-    n: Flag::Set("N - Set if the result is negative; cleared otherwise."),
+    x: Flag::Set("X — Set the same as carry"),
+    n: Flag::Set("N — Set if the result is negative; cleared otherwise."),
     z: Flag::Set("Z — Set if the result is zero; cleared otherwise."),
     v: Flag::Set("V — Set if an overflow is generated; cleared otherwise."),
     c: Flag::Set("C — Set if a carry is generated; cleared otherwise."),
 };
 
 const FLAGS_X: FlagsDesc = FlagsDesc {
-    x: Flag::Set("X - Set the same as carry"),
-    n: Flag::Set("N - Set if the result is negative; cleared otherwise."),
+    x: Flag::Set("X — Set the same as carry"),
+    n: Flag::Set("N — Set if the result is negative; cleared otherwise."),
     z: Flag::Set("Z — Cleared if the result is non-zero; unchanged otherwise."),
     v: Flag::Set("V — Set if an overflow is generated; cleared otherwise."),
     c: Flag::Set("C — Set if a carry is generated; cleared otherwise."),
@@ -188,7 +198,7 @@ This operation is a byte operation only.",
 };
 
 pub const ADD_DESC: Description = Description {
-    description: "Adds the source operand to the destination operand using binary addition and stores the result in the destination location. The size of the operation may be specified as byte, word, or long. The mode of the instruction indicates which operand is the source and which is the destination, as well as the operand size.",
+    description: "Adds the source operand to the destination operand using binary addition and stores the result in the destination location. The size of the operation may be specified as byte, word, or long. The mode of the instruction indicates which operand is the source and which is the destination, as well as the operand size. Notice that conditon flags are not affected when target is An",
     operation: "Source + Destination → Destination",
     assembler: &["Add < ea > ,Dn", "Add Dn, < ea >"],
     attributes: "Byte, Word, Long",
@@ -570,7 +580,7 @@ pub const SCC_DESC: Description = Description {
 };
 
 pub const SUB_DESC: Description = Description {
-    description: "Subtracts the source operand from the destination operand and stores the result in the destination. The size of the operation is specified as byte, word, or long. The mode of the instruction indicates which operand is the source, which is the destination, and which is the operand size.",
+    description: "Subtracts the source operand from the destination operand and stores the result in the destination. The size of the operation is specified as byte, word, or long. The mode of the instruction indicates which operand is the source, which is the destination, and which is the operand size. Notice that conditon flags are not affected when target is An",
     operation: "Source - Destination → Destination",
     assembler: &["sub < ea > ,Dn", "sub Dn, < ea >"],
     attributes: "Byte, Word, Long",
