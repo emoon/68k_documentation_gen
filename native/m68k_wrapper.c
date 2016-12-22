@@ -131,7 +131,6 @@ void m68k_wrapper_init() {
 	m68k_init();
 	m68k_set_cpu_type(M68K_CPU_TYPE_68000);
 	m68k_pulse_reset();
-	printf("emulator init\n");
 }
 
 void m68k_run_instructions(void* data, int inst_count, int* cycle_result)
