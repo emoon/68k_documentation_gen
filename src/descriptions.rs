@@ -243,7 +243,8 @@ pub const BCC_DESC: Description = Description {
                   The displacement is a twos-complement integer that represents the relative distance in bytes from the current program counter to the destination program counter.
                   If the 8-bit displacement field in the instruction word is zero, a 16-bit displacement (the word immediately following the instruction) is used.
                   If the 8-bit displacement field in the instruction word is all ones ($FF), the 32-bit displacement (long word immediately following the instruction) is used.
-                  Condition code cc specifies one of the following conditional tests.",
+
+Condition code cc specifies one of the following conditional tests.",
     operation: "If Condition True Then PC + dn → PC",
     assembler: &["bcc < label >"],
     attributes: "Byte, Word",
