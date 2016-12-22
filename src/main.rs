@@ -53,6 +53,7 @@ struct Instruction<'a> {
     name: &'static str,
     desc: Option<Description>,
     matrix: Option<&'a [&'a [Op]]>,
+    cc_codes: Option<&'a [&'a [&'static str]]>,
     override_output_b: Option<&'a [&'a [&'static str]]>,
     override_output_w: Option<&'a [&'a [&'static str]]>,
     override_output_l: Option<&'a [&'a [&'static str]]>,
@@ -72,6 +73,7 @@ impl <'a> Default for Instruction <'a> {
             name: "",
             desc: None,
             matrix: None,
+            cc_codes: None,
             override_output_b: None,
             override_output_w: None,
             override_output_l: None,
@@ -87,7 +89,7 @@ fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
 
     let output = Command::new(VASM_EXE)
         .arg("-no-opt")
-        .arg("-m68000")
+//        .arg("-m68000")
         .arg(filename)
         .arg("-Fbin")
         .arg("-o")
@@ -99,6 +101,21 @@ fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
 }
 
 fn print_grid_table(name: &str, cycles: &Vec<BuildResult>, src_table: &[Op], dest_table: &[Op]) {
+    // Check if we have anything to print
+
+    let mut should_print = false;
+
+    for c in cycles {
+        if c.cycle_count.is_some() {
+            should_print = true;
+            break;
+        }
+    }
+
+    if !should_print {
+        return;
+    }
+
     print!("| {name:<width$}", name = name, width = 9);
 
     for dst in dest_table {
@@ -175,8 +192,60 @@ fn print_table(name: &str, cycles: &Vec<BuildResult>, dest_table: &[Op]) {
     println!("");
 }
 
+fn print_cc_codes(table: &[&[&'static str]]) {
+    // it's assumed the first row is the header and name is the first entry always
+
+    let mut title_row_lengths = Vec::new();
+    let title_row = table[0];
+
+    for entry in title_row {
+        print!("| {} ", entry);
+    }
+
+    println!("|");
+
+    for entry in title_row {
+        print!("|");
+
+        for c in entry.chars() {
+            print!("-")
+        }
+
+        title_row_lengths.push(entry.len());
+
+        print!("--")
+    }
+
+    println!("|");
+
+    for t in &table[1..] {
+        for (i, entry) in t.iter().enumerate() {
+            print!("| {name:<width$}", name = entry, width = title_row_lengths[i] + 1);
+        }
+
+        println!("|");
+    }
+
+    println!("");
+}
+
+
 fn print_instruction_header(inst: &Instruction) {
-    let name = inst.name.to_uppercase();
+    let mut name = inst.name.to_uppercase();
+
+    // Hack
+    if name == "BCC" {
+        name = "Bcc".to_owned();
+    }
+
+    if name == "SCC" {
+        name = "Scc".to_owned();
+    }
+
+    if name == "DBCC" {
+        name = "DBcc".to_owned();
+    }
+
     println!("## {}\n", name);
     if let Some(ref desc) = inst.desc {
         println!("**Operation:**      {}\n", desc.operation);
@@ -203,9 +272,15 @@ fn print_instruction_header(inst: &Instruction) {
 
         println!("|");
 
-        println!("\n\n**Attributes:** Size = ({})\n", desc.attributes);
+        println!("\n**Attributes:** Size = ({})\n", desc.attributes);
 
         println!("**Description:** {}\n", desc.description);
+
+        if let Some(cc_codes) = inst.cc_codes {
+            print_cc_codes(cc_codes);
+        }
+
+        println!("### Instruction Execution Times");
     }
     else {
         println!("__No Description__\n");
@@ -267,14 +342,7 @@ fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -
 
     statements.par_iter_mut().weight_max().for_each(|v| {
         let src = v.src.unwrap();
-        let statement;
-
-        if src.print_name == "#xxx" && is_long {
-            statement = format!("{} {},{}", name, "#$ffffff", v.dst.name);
-        } else {
-            statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
-        }
-
+        let statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
         if compile_statement(&v.temp_file, &v.temp_out, &statement) {
             v.cycle_count = Some(0); // indicate that this should be processed
         }
@@ -306,7 +374,6 @@ fn generate_statements_one_arg(name: &str, inst: &Instruction, is_long: bool) ->
 
     statements.par_iter_mut().weight_max().for_each(|v| {
         let statement = format!("{} {}", name, v.dst.name);
-        println!("one arg statement {}", statement);
         if compile_statement(&v.temp_file, &v.temp_out, &statement) {
             v.cycle_count = Some(0);
         }
@@ -441,6 +508,16 @@ fn main() {
         Op::new("2(pc,d0)", "d(PC,Dn)"),
         Op::new("#8", "#xxx")];
 
+    let cc_codes: &[&[&'static str]] = &[
+        &["Mnemonic", "Condition", "Mnemonic", "Condition"],
+        &["CC (HI)", "Carry Clear","LS","Low or Same"],
+        &["CS (LO)", "Carry Set",  "LT","Less Than"],
+        &["EQ", "Equal", "MI","Minus"],
+        &["GE", "Greater or Equal","NE","Not Equal"],
+        &["GT", "Greather Than","PL","Plus"],
+        &["HI", "High","VC","Overflow Clear"],
+        &["LE", "Less or Equal","VS","Overflow Set"]];
+
     //let dest_types_none = [Op::new("", "")];
 
     //let mut Some(two_ops) = Vec::<&[Op]>::new();
@@ -448,15 +525,20 @@ fn main() {
     let one_op: &[&[Op]] = &[&dest_types];
 
     let shift_desc: &[&[&'static str]] = &[
-        &["Dn", "An", "(An)", "(An)+", "-(An)", "d(An)", "d(An,Dn)", "xxx.W", "xxx."],
+        &["Dn", "An", "(An)", "(An)+", "-(An)", "d(An)", "d(An,Dn)", "xxx.W", "xxx.L"],
         &["#1", "8","*","12","12","14","16","18","16","20"],
         &["#1-8", "6+2n", "*", "*", "*", "*", "*", "*", "*", "*"],
         &["Dn", "6+2n", "*", "*", "*", "*", "*", "*", "*", "*"]];
 
     let shift_desc_long: &[&[&'static str]] = &[
-        &["Dn"],
-        &["#1-8", "8+2n"],
-        &["Dn", "8+2n"]];
+        &["Dn", "An", "(An)", "(An)+", "-(An)", "d(An)", "d(An,Dn)", "xxx.W", "xxx.L"],
+        &["#1-8", "8+2n", "*", "*", "*", "*", "*", "*", "*", "*"],
+        &["Dn", "8+2n", "*", "*", "*", "*", "*", "*", "*", "*"]];
+
+    let bcc_desc: &[&[&'static str]] = &[
+        &["Displacement", "Branch Taken", "Branch Not Taken"],
+        &["", "Byte", "10", "8"],
+        &["", "Word", "10", "12"]];
 
     //Some(two_ops).push(&src_types);
     //Some(two_ops).push(&dest_types);
@@ -503,6 +585,14 @@ fn main() {
             matrix: Some(two_ops),
             override_output_w: Some(&shift_desc),
             override_output_l: Some(&shift_desc_long),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "bcc",
+            desc: Some(BCC_DESC),
+            matrix: Some(one_op),
+            cc_codes: Some(&cc_codes),
+            override_output_w: Some(&shift_desc),
             .. Instruction::default()
         },
         Instruction {
@@ -679,7 +769,6 @@ fn main() {
        ];
        */
 
-
     for inst in &inst_2_ops_000 {
         let name_long = format!("{}.l", inst.name);
 
@@ -693,6 +782,22 @@ fn main() {
         //generate_table(inst.name, false, Some(&src_types), &dest_types);
         //generate_table(&name_long, true, Some(&src_types), &dest_types);
     }
+
+    /*
+    {
+        let inst = Instruction {
+                name: "addq.l",
+                desc: Some(ADDQ_DESC),
+                matrix: Some(two_ops),
+                //cc_codes: Some(&&cc_codes),
+                //override_output_w: Some(bcc_desc),
+                .. Instruction::default()
+        };
+
+        print_instruction_header(&inst);
+        generate_table_2(inst.name, &inst, true);
+    }
+    */
 
     // Generate instructions with one op
 
@@ -723,5 +828,4 @@ extern "C" {
     fn m68k_wrapper_init();
     fn m68k_run_instructions(instructions: *const raw::c_void, count: u32, cycle_res: *mut u32);
 }
-
 
