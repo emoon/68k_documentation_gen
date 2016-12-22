@@ -175,10 +175,12 @@ pub struct Description {
 }
 
 pub const ABCD_DESC: Description = Description {
-    description: "Adds the source operand to the destination operand along with the extend bit, and stores the result in the destination location. The addition is performed using binary- coded decimal arithmetic. The operands, which are packed binary-coded decimal numbers, can be addressed in two different ways\n
-        1. Data Register to Data Register: The operands are contained in the data registers specified in the instruction.\n
-        2. Memory to Memory: The operands are addressed with the predecrement addressing mode using the address registers specified in the instruction.\n
-        This operation is a byte operation only.",
+    description: "Adds the source operand to the destination operand along with the extend bit, and stores the result in the destination location. The addition is performed using binary- coded decimal arithmetic. The operands, which are packed binary-coded decimal numbers, can be addressed in two different ways
+
+1. Data Register to Data Register: The operands are contained in the data registers specified in the instruction.
+2. Memory to Memory: The operands are addressed with the predecrement addressing mode using the address registers specified in the instruction.
+
+This operation is a byte operation only.",
     operation: "Source10 + Destination10 + X → Destination",
     assembler: &["abcd < ea > ,Dn", "Add Dn, < ea >"],
     attributes: "Byte, Word, Long",
@@ -203,9 +205,11 @@ pub const ADDQ_DESC: Description = Description {
 
 pub const ADDX_DESC: Description = Description {
     description: "Adds the source operand and the extend bit to the destination operand and stores the result in the destination location. The operands can be addressed in two different ways:
-                    1. Data register to data register—The data registers specified in the instruction contain the operands.
-                    2. Memory to memory—The address registers specified in the instruction address the operands using the predecrement addressing mode.
-                    The size of the operation can be specified as byte, word, or long.",
+
+1. Data register to data register—The data registers specified in the instruction contain the operands.
+2. Memory to memory—The address registers specified in the instruction address the operands using the predecrement addressing mode.
+
+The size of the operation can be specified as byte, word, or long.",
     operation: "Source + Destination + X → Destination",
     assembler: &["addx Dy,Dx", "addx -(Ay),-(Ax)"],
     attributes: "Byte, Word, Long",
@@ -222,10 +226,11 @@ pub const AND_DESC: Description = Description {
 
 pub const ASL_ASR_DESC: Description = Description {
     description: "Arithmetically shifts the bits of the operand in the direction (L or R) specified. The carry bit receives the last bit shifted out of the operand. The shift count for the shifting of a register may be specified in two different ways:
-                    1. Immediate—The shift count is specified in the instruction (shift range, 1 – 8).
-                    2. Register—The shift count is the value in the data register specified in instruction modulo 64.
-                    The size of the operation can be specified as byte, word, or long. An operand in mem- ory can be shifted one bit only, and the operand size is restricted to a word.
-                    For ASL, the operand is shifted left; the number of positions shifted is the shift count. Bits shifted out of the high-order bit go to both the carry and the extend bits; zeros are shifted into the low-order bit. The overflow bit indicates if any sign changes occur dur- ing the shift.",
+
+1. Immediate—The shift count is specified in the instruction (shift range, 1 – 8).
+2. Register—The shift count is the value in the data register specified in instruction modulo 64.
+
+The size of the operation can be specified as byte, word, or long. An operand in mem- ory can be shifted one bit only, and the operand size is restricted to a word. For ASL, the operand is shifted left; the number of positions shifted is the shift count. Bits shifted out of the high-order bit go to both the carry and the extend bits; zeros are shifted into the low-order bit. The overflow bit indicates if any sign changes occur dur- ing the shift.",
     operation: "Destination Shifted By Count → Destination",
     assembler: &["ASd Dx,Dy", "ASd # < data > ,Dy", "ASd < ea >", "where d is direction, L or R"],
     attributes: "Byte, Word, Long",
@@ -247,8 +252,10 @@ pub const BCC_DESC: Description = Description {
 
 pub const BCHG_DESC: Description = Description {
     description: "Tests a bit in the destination operand and sets the Z condition code appropriately, then inverts the specified bit in the destination. When the destination is a data register, any of the 32 bits can be specified by the modulo 32-bit number. When the destination is a memory location, the operation is a byte operation, and the bit number is modulo 8. In all cases, bit zero refers to the least significant bit. The bit number for this operation may be specified in either of two ways:
-                    1. Immediate—The bit number is specified in a second word of the instruction.
-                    2. Register—The specified data register contains the bit number.",
+
+1. Immediate—The bit number is specified in a second word of the instruction.
+2. Register—The specified data register contains the bit number.",
+
     operation: "TEST ( < number > of Destination) → Z;
                 TEST ( < number > of Destination) → < bit number > of Destination",
     assembler: &["bchg dn, < ea >", "bchg # < data > , < ea >"],
@@ -258,8 +265,10 @@ pub const BCHG_DESC: Description = Description {
 
 pub const BCLR_DESC: Description = Description {
     description: "Tests a bit in the destination operand and sets the Z condition code appropriately, then clears the specified bit in the destination. When a data register is the destination, any of the 32 bits can be specified by a modulo 32-bit number. When a memory location is the destination, the operation is a byte operation, and the bit number is modulo 8. In all cases, bit zero refers to the least significant bit. The bit number for this operation can be specified in either of two ways:
-                    1. Immediate—The bit number is specified in a second word of the instruction.
-                    2. Register—The specified data register contains the bit number.",
+
+1. Immediate—The bit number is specified in a second word of the instruction.
+2. Register—The specified data register contains the bit number.",
+
     operation: "TEST ( < bit number > of Destination) → Z; 0 → < bit number > of Destination",
     assembler: &["bclr dn, < ea >", "bclr # < data > , < ea >"],
     attributes: "Byte, Long",
@@ -276,8 +285,9 @@ pub const BRA_DESC: Description = Description {
 
 pub const BSET_DESC: Description = Description {
     description: "Description: Tests a bit in the destination operand and sets the Z condition code appropriately, then sets the specified bit in the destination operand. When a data register is the destination, any of the 32 bits can be specified by a modulo 32-bit number. When a memory location is the destination, the operation is a byte operation, and the bit number is modulo 8. In all cases, bit zero refers to the least significant bit. The bit number for this operation can be specified in either of two ways:
-                    1. Immediate—The bit number is specified in the second word of the instruction.
-                    2. Register—The specified data register contains the bit number.",
+
+1. Immediate—The bit number is specified in the second word of the instruction.
+2. Register—The specified data register contains the bit number.",
     operation: "TEST ( < bit number > of Destination) → Z; 1 → < bit number > of Destination",
     assembler: &["btest dn, < ea >", "btest # < data > , < ea >"],
     attributes: "Byte, Long",
@@ -294,8 +304,9 @@ pub const BSR_DESC: Description = Description {
 
 pub const BTST_DESC: Description = Description {
     description: "Tests a bit in the destination operand and sets the Z condition code appropriately. When a data register is the destination, any of the 32 bits can be specified by a modulo 32- bit number. When a memory location is the destination, the operation is a byte operation, and the bit number is modulo 8. In all cases, bit zero refers to the least significant bit. The bit number for this operation can be specified in either of two ways:
-                 1. Immediate—The bit number is specified in a second word of the instruction.
-                 2. Register—The specified data register contains the bit number.",
+
+1. Immediate—The bit number is specified in a second word of the instruction.
+2. Register—The specified data register contains the bit number.",
     operation: "TEST ( < bit number > of Destination) → Z",
     assembler: &["btest dn, < ea >", "btest # < data > , < ea >"],
     attributes: "Byte, Long",
@@ -336,10 +347,11 @@ pub const DBCC_DESC: Description = Description {
 };
 
 pub const DIVS_DIVU_DESC: Description = Description {
-    description: "Divides the signed destination operand by the signed source operand and stores the signed result in the destination. The result is a quotient in the lower word (least significant 16 bits) and a remainder in the upper word (most significant 16 bits). The sign of the remainder is the same as the sign of the dividend.
-                    Two special conditions may arise during the operation:
-                    1. Division by zero causes a trap.
-                    2. Overflow may be detected and set before the instruction completes. If the instruction detects an overflow, it sets the overflow condition code, and the operands are unaffected.",
+    description: "Divides the signed destination operand by the signed source operand and stores the signed result in the destination. The result is a quotient in the lower word (least significant 16 bits) and a remainder in the upper word (most significant 16 bits). The sign of the remainder is the same as the sign of the dividend. Two special conditions may arise during the operation:
+
+1. Division by zero causes a trap.
+2. Overflow may be detected and set before the instruction completes. If the instruction detects an overflow, it sets the overflow condition code, and the operands are unaffected.",
+
     operation: "Destination / Source → Destination",
     assembler: &["DIVS.W < ea > ,Dn32/16 → 16r – 16q"],
     attributes: "Word",
@@ -356,9 +368,10 @@ pub const EOR_DESC: Description = Description {
 
 pub const EXG_DESC: Description = Description {
     description: "Exchanges the contents of two 32-bit registers. The instruction performs three types of exchanges.
-					1. Exchange data registers.
-					2. Exchange address registers.
-					3. Exchange a data register and an address register.",
+
+1. Exchange data registers.
+2. Exchange address registers.
+3. Exchange a data register and an address register.",
     operation: "Rx ←→ Ry",
     assembler: &["exg Dx,Dy", "exg Ax,Ay", "exg Dx,Ay"],
     attributes: "Long",
@@ -407,10 +420,11 @@ pub const LINK_DESC: Description = Description {
 
 pub const LSL_LSR_DESC: Description = Description {
     description: "Shifts the bits of the operand in the direction specified (L or R). The carry bit receives the last bit shifted out of the operand. The shift count for the shifting of a register is specified in two different ways:
-					1. Immediate—The shift count (1 – 8) is specified in the instruction.
-					2. Register—The shift count is the value in the data register specified in the in- struction modulo 64.
-					The size of the operation for register destinations may be specified as byte, word, or long. The contents of memory, < ea > , can be shifted one bit only, and the operand size is restricted to a word.
-					The LSL instruction shifts the operand to the left the number of positions specified as the shift count. Bits shifted out of the high-order bit go to both the carry and the extend bits; zeros are shifted into the low-order bit.",
+
+1. Immediate—The shift count (1 – 8) is specified in the instruction.
+2. Register—The shift count is the value in the data register specified in the in- struction modulo 64.
+The size of the operation for register destinations may be specified as byte, word, or long. The contents of memory, < ea > , can be shifted one bit only, and the operand size is restricted to a word.
+The LSL instruction shifts the operand to the left the number of positions specified as the shift count. Bits shifted out of the high-order bit go to both the carry and the extend bits; zeros are shifted into the low-order bit.",
     operation: "Destination Shifted By Count → Destination",
     assembler: &["LSd Dx,Dy", "LSd # < data > ,Dy", "LSd < ea >", "where d is direction, L or R"],
     attributes: "Byte, Word, Long",
@@ -427,9 +441,9 @@ pub const MOVE_DESC: Description = Description {
 
 pub const MOVEM_DESC: Description = Description {
     description: "Moves the contents of selected registers to or from consecutive memory locations starting at the location specified by the effective address. A register is selected if the bit in the mask field corresponding to that register is set. The instruction size determines whether 16 or 32 bits of each register are transferred. In the case of a word transfer to either address or data registers, each word is sign-extended to 32 bits, and the resulting long word is loaded into the associated register.
-				  Selecting the addressing mode also selects the mode of operation of the MOVEM instruction, and only the control modes, the predecrement mode, and the postincre- ment mode are valid. If the effective address is specified by one of the control modes, the registers are transferred starting at the specified address, and the address is incre- mented by the operand length (2 or 4) following each transfer. The order of the regis- ters is from D0 to D7, then from A0 to A7.
-				  If the effective address is specified by the predecrement mode, only a register-to-mem- ory operation is allowed. The registers are stored starting at the specified address minus the operand length (2 or 4), and the address is decremented by the operand length following each transfer. The order of storing is from A7 to A0, then from D7 to D0. When the instruction has completed, the decremented address register contains the address of the last operand stored. For the MC68020, MC68030, MC68040, and CPU32, if the addressing register is also moved to memory, the value written is the ini- tial register value decremented by the size of the operation. The MC68000 and MC68010 write the initial register value (not decremented).
-				  If the effective address is specified by the postincrement mode, only a memory-to-reg- ister operation is allowed. The registers are loaded starting at the specified address; the address is incremented by the operand length (2 or 4) following each transfer. The order of loading is the same as that of control mode addressing. When the instruction has completed, the incremented address register contains the address of the last oper- and loaded plus the operand length. If the addressing register is also loaded from memory, the memory value is ignored and the register is written with the postincre- mented effective address.",
+Selecting the addressing mode also selects the mode of operation of the MOVEM instruction, and only the control modes, the predecrement mode, and the postincre- ment mode are valid. If the effective address is specified by one of the control modes, the registers are transferred starting at the specified address, and the address is incre- mented by the operand length (2 or 4) following each transfer. The order of the regis- ters is from D0 to D7, then from A0 to A7.
+If the effective address is specified by the predecrement mode, only a register-to-mem- ory operation is allowed. The registers are stored starting at the specified address minus the operand length (2 or 4), and the address is decremented by the operand length following each transfer. The order of storing is from A7 to A0, then from D7 to D0. When the instruction has completed, the decremented address register contains the address of the last operand stored. For the MC68020, MC68030, MC68040, and CPU32, if the addressing register is also moved to memory, the value written is the ini- tial register value decremented by the size of the operation. The MC68000 and MC68010 write the initial register value (not decremented).
+If the effective address is specified by the postincrement mode, only a memory-to-reg- ister operation is allowed. The registers are loaded starting at the specified address; the address is incremented by the operand length (2 or 4) following each transfer. The order of loading is the same as that of control mode addressing. When the instruction has completed, the incremented address register contains the address of the last oper- and loaded plus the operand length. If the addressing register is also loaded from memory, the memory value is ignored and the register is written with the postincre- mented effective address.",
     operation: "Registers → Destination; Source → Registers",
     assembler: &["movem < list >, < ea >", "movem < list >, < ea >"],
     attributes: "Byte, Word, Long",
@@ -510,10 +524,12 @@ pub const PEA_DESC: Description = Description {
 
 pub const ROL_ROR_DESC: Description = Description {
     description: "Rotates the bits of the operand in the direction specified (L or R). The extend bit is not included in the rotation. The rotate count for the rotation of a register is specified in either of two ways:
-					1. Immediate—The rotate count (1 – 8) is specified in the instruction.
-					2. Register—The rotate count is the value in the data register specified in the in- struction, modulo 64.
-				  The size of the operation for register destinations is specified as byte, word, or long. The contents of memory, (ROd < ea > ), can be rotated one bit only, and operand size is restricted to a word.
-				  The ROL instruction rotates the bits of the operand to the left; the rotate count deter- mines the number of bit positions rotated. Bits rotated out of the high-order bit go to the carry bit and also back into the low-order bit.",
+
+1. Immediate—The rotate count (1 – 8) is specified in the instruction.
+2. Register—The rotate count is the value in the data register specified in the in- struction, modulo 64.
+
+The size of the operation for register destinations is specified as byte, word, or long. The contents of memory, (ROd < ea > ), can be rotated one bit only, and operand size is restricted to a word.
+The ROL instruction rotates the bits of the operand to the left; the rotate count deter- mines the number of bit positions rotated. Bits rotated out of the high-order bit go to the carry bit and also back into the low-order bit.",
     operation: "Destination Rotated By Count → Destination",
     assembler: &["ROd Dx,Dy", "ROd # < data > ,Dy", "ROd < ea >", "where d is direction, L or R"],
     attributes: "Byte, Word, Long",
@@ -523,9 +539,11 @@ pub const ROL_ROR_DESC: Description = Description {
 
 pub const ROXL_ROXR_DESC: Description = Description {
     description: "Rotates the bits of the operand in the direction specified (L or R). The extend bit is included in the rotation. The rotate count for the rotation of a register is specified in either of two ways:
-					1. Immediate—The rotate count (1 – 8) is specified in the instruction.
-					2. Register—The rotate count is the value in the data register specified in the in- struction, modulo 64.
-				  The size of the operation for register destinations is specified as byte, word, or long. The contents of memory, < ea > , can be rotated one bit only, and operand size is restricted to a word. The ROXL instruction rotates the bits of the operand to the left; the rotate count determines the number of bit positions rotated. Bits rotated out of the high- order bit go to the carry bit and the extend bit; the previous value of the extend bit rotates into the low-order bit.",
+
+1. Immediate—The rotate count (1 – 8) is specified in the instruction.
+2. Register—The rotate count is the value in the data register specified in the in- struction, modulo 64.
+
+The size of the operation for register destinations is specified as byte, word, or long. The contents of memory, < ea > , can be rotated one bit only, and operand size is restricted to a word. The ROXL instruction rotates the bits of the operand to the left; the rotate count determines the number of bit positions rotated. Bits rotated out of the high- order bit go to the carry bit and the extend bit; the previous value of the extend bit rotates into the low-order bit.",
     operation: "Destination Rotated With X By Count → Destination",
     assembler: &["ROXd Dx,Dy", "ROXd # < data > ,Dy", "ROXd < ea >", "where d is direction, L or R"],
     attributes: "Byte, Word, Long",
@@ -567,10 +585,11 @@ pub const SUBQ_DESC: Description = Description {
 };
 
 pub const SUBX_DESC: Description = Description {
-    description: "Subtracts the source operand and the extend bit from the destination operand and stores the result in the destination location.
-					The instruction has two modes:
-				  1. Data register to data register—the data registers specified in the instruction con- tain the operands.
-				  2. Memory to memory—the address registers specified in the instruction access the operands from memory using the predecrement addressing mode.",
+    description: "Subtracts the source operand and the extend bit from the destination operand and stores the result in the destination location. The instruction has two modes:
+
+1. Data register to data register—the data registers specified in the instruction con- tain the operands.
+2. Memory to memory—the address registers specified in the instruction access the operands from memory using the predecrement addressing mode.",
+
     operation: "Source - Destination + X → Destination",
     assembler: &["subx Dy,Dx", "subx -(Ay),-(Ax)"],
     attributes: "Byte, Word, Long",
