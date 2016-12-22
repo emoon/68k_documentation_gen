@@ -12,6 +12,7 @@ pub mod descriptions;
 
 use descriptions::*;
 
+
 #[cfg(target_os="windows")]
 const VASM_EXE: &'static str = "bin/win/vasmm68k_mot.exe";
 
@@ -47,11 +48,35 @@ impl Op {
         }
     }
 }
+
 struct Instruction<'a> {
     name: &'static str,
     desc: Option<Description>,
-    matrix: &'a [&'a [Op]],
-    override_imm: Option<usize>,
+    matrix: Option<&'a [&'a [Op]]>,
+    override_output_b: Option<&'a [&'a [&'static str]]>,
+    override_output_w: Option<&'a [&'a [&'static str]]>,
+    override_output_l: Option<&'a [&'a [&'static str]]>,
+}
+
+impl <'a> Instruction<'a> {
+    pub fn has_override(&self) -> bool {
+        return self.override_output_b.is_some() ||
+               self.override_output_w.is_some() ||
+               self.override_output_l.is_some();
+    }
+}
+
+impl <'a> Default for Instruction <'a> {
+    fn default() -> Self {
+        Instruction {
+            name: "",
+            desc: None,
+            matrix: None,
+            override_output_b: None,
+            override_output_w: None,
+            override_output_l: None,
+        }
+    }
 }
 
 fn compile_statement(filename: &str, file_out: &str, statement: &str) -> bool {
@@ -156,10 +181,28 @@ fn print_instruction_header(inst: &Instruction) {
     if let Some(ref desc) = inst.desc {
         println!("**Operation:**      {}\n", desc.operation);
 
-        print!("**Assembler:** ");
+        // print the syntax
+
+        print!("| Assembler Syntax ");
         for assem in desc.assembler {
-            print!("{}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;", assem);
+            print!("| {} ", assem);
         }
+
+        println!("|");
+        print!("|------------------");
+
+
+        for assem in desc.assembler {
+            print!("|");
+
+            for _ in assem.chars() {
+                print!("-");
+            }
+            print!("--");
+        }
+
+        println!("|");
+
         println!("\n\n**Attributes:** Size = ({})\n", desc.attributes);
 
         println!("**Description:** {}\n", desc.description);
@@ -185,7 +228,6 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
         }
     }
 
-
     unsafe {
         m68k_run_instructions(instructions.as_ptr() as *const raw::c_void, inst_count, cycle_count.as_mut_ptr());
     }
@@ -200,85 +242,14 @@ fn compile_cycle_counts(statements: &mut Vec<BuildResult>) {
     }
 }
 
-fn generate_table(name: &str,
-                  is_long: bool,
-                  src_table: Option<&[Op]>,
-                  dest_table: &[Op]) {
-    let mut statements = Vec::with_capacity(20 * 20);
-    let mut count = 0;
-
-    if let Some(src_opts) = src_table {
-        for src in src_opts {
-            for dst in dest_table {
-                let file_in = format!("target/temp_{}.s", count);
-                let file_out = format!("target/temp_{}.o", count);
-
-                statements.push(BuildResult {
-                    src: Some(src.clone()),
-                    dst: dst.clone(),
-                    temp_file: file_in,
-                    temp_out: file_out,
-                    cycle_count: None,
-                });
-
-                count += 1;
-            }
-        }
-
-        statements.par_iter_mut().weight_max().for_each(|v| {
-            let src = v.src.unwrap();
-            let statement;
-
-            if src.print_name == "#xxx" && is_long {
-                statement = format!("{} {},{}", name, "#$ffffff", v.dst.name);
-            } else {
-                statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
-            }
-            
-            //println!("Statement {}", statement);
-            if compile_statement(&v.temp_file, &v.temp_out, &statement) {
-                v.cycle_count = Some(0); // indicate that this should be processed
-            }
-        });
-
-        compile_cycle_counts(&mut statements);
-
-        print_grid_table(name, &statements, &src_opts, dest_table);
-    } else {
-        for dst in dest_table {
-            let file_in = format!("target/temp_{}.s", count);
-            let file_out = format!("target/temp_{}.o", count);
-
-            statements.push(BuildResult {
-                src: None,
-                dst: dst.clone(),
-                temp_file: file_in,
-                temp_out: file_out,
-                cycle_count: None,
-            });
-
-            count += 1;
-        }
-
-        statements.par_iter_mut().weight_max().for_each(|v| {
-            let statement = format!("{} {}", name, v.dst.name);
-            if compile_statement(&v.temp_file, &v.temp_out, &statement) {
-                v.cycle_count = Some(0);
-            }
-        });
-
-        compile_cycle_counts(&mut statements);
-
-        print_table(name, &statements, dest_table);
-    }
-}
-
 fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -> Vec<BuildResult> {
     let mut statements = Vec::with_capacity(20 * 20);
     let mut count = 0;
 
-    for src in inst.matrix[0] {
-        for dst in inst.matrix[1] {
+    let matrix = inst.matrix.unwrap();
+
+    for src in matrix[0] {
+        for dst in matrix[1] {
             let file_in = format!("target/temp_{}.s", count);
             let file_out = format!("target/temp_{}.o", count);
 
@@ -303,7 +274,7 @@ fn generate_statements_two_args(name: &str, inst: &Instruction, is_long: bool) -
         } else {
             statement = format!("{} {},{}", name, v.src.unwrap().name, v.dst.name);
         }
-        
+
         if compile_statement(&v.temp_file, &v.temp_out, &statement) {
             v.cycle_count = Some(0); // indicate that this should be processed
         }
@@ -316,7 +287,9 @@ fn generate_statements_one_arg(name: &str, inst: &Instruction, is_long: bool) ->
     let mut statements = Vec::with_capacity(20 * 20);
     let mut count = 0;
 
-    for dst in inst.matrix[0] {
+    let matrix = inst.matrix.unwrap();
+
+    for dst in matrix[0] {
         let file_in = format!("target/temp_{}.s", count);
         let file_out = format!("target/temp_{}.o", count);
 
@@ -350,7 +323,7 @@ fn generate_statements_no_args(name: &str) -> Vec<BuildResult> {
     statement.push(BuildResult {
         src: None,
         dst: Op::new("", ""),
-        temp_file: "".to_owned(), 
+        temp_file: "".to_owned(),
         temp_out:  "".to_owned(),
         cycle_count: None,
     });
@@ -362,22 +335,84 @@ fn generate_statements_no_args(name: &str) -> Vec<BuildResult> {
     statement
 }
 
+fn print_predef_table(name: &str, table: &[&[&'static str]]) {
+    // it's assumed the first row is the header and name is the first entry always
+
+    let mut title_row_lengths = Vec::new();
+    let title_row = table[0];
+
+    print!("| {} ", name);
+
+    for entry in title_row {
+        print!("| {} ", entry);
+    }
+
+    println!("|");
+    print!("|--");
+
+    title_row_lengths.push(name.len());
+
+    for c in name.chars() {
+        print!("-")
+    }
+
+    for entry in title_row {
+        print!("|");
+
+        for c in entry.chars() {
+            print!("-")
+        }
+
+        title_row_lengths.push(entry.len());
+
+        print!("--")
+    }
+
+    println!("|");
+
+    for t in &table[1..] {
+        for (i, entry) in t.iter().enumerate() {
+            print!("| {name:<width$}", name = entry, width = title_row_lengths[i] + 1);
+        }
+
+        println!("|");
+    }
+
+    println!("");
+}
+
 fn generate_table_2(name: &str, inst: &Instruction, is_long: bool) {
+    let matrix = inst.matrix.unwrap();
     let mut statements;
 
-    if inst.matrix.len() == 2 {
+    if let Some(over) = inst.override_output_b {
+        print_predef_table(name, over);
+    }
+
+    if let Some(over) = inst.override_output_w {
+        print_predef_table(name, over);
+    }
+
+    if let Some(over) = inst.override_output_l {
+        let name_long = format!("{}.l", name);
+        print_predef_table(&name_long, over);
+    }
+
+    if inst.has_override() {
+        return;
+    }
+
+    if matrix.len() == 2 {
         statements = generate_statements_two_args(name, inst, is_long);
         compile_cycle_counts(&mut statements);
-        print_grid_table(name, &statements, inst.matrix[0], inst.matrix[1]);
-    } else if inst.matrix.len() == 1 {
+        print_grid_table(name, &statements, matrix[0], matrix[1]);
+    } else if matrix.len() == 1 {
         statements = generate_statements_one_arg(name, inst, is_long);
         compile_cycle_counts(&mut statements);
-        print_table(name, &statements, inst.matrix[0]);
+        print_table(name, &statements, matrix[0]);
     } else {
         statements = generate_statements_no_args(name);
     }
-
-
 }
 
 fn main() {
@@ -404,16 +439,27 @@ fn main() {
         Op::new("$4.L", "xxx.L"),
         Op::new("2(pc)", "d(PC)"),
         Op::new("2(pc,d0)", "d(PC,Dn)"),
-        Op::new("#2000", "#xxx")];
+        Op::new("#8", "#xxx")];
 
     //let dest_types_none = [Op::new("", "")];
 
-    //let mut two_ops = Vec::<&[Op]>::new();
+    //let mut Some(two_ops) = Vec::<&[Op]>::new();
     let two_ops: &[&[Op]] = &[&src_types, &dest_types];
     let one_op: &[&[Op]] = &[&dest_types];
 
-    //two_ops.push(&src_types);
-    //two_ops.push(&dest_types);
+    let shift_desc: &[&[&'static str]] = &[
+        &["Dn", "An", "(An)", "(An)+", "-(An)", "d(An)", "d(An,Dn)", "xxx.W", "xxx."],
+        &["#1", "8","*","12","12","14","16","18","16","20"],
+        &["#1-8", "6+2n", "*", "*", "*", "*", "*", "*", "*", "*"],
+        &["Dn", "6+2n", "*", "*", "*", "*", "*", "*", "*", "*"]];
+
+    let shift_desc_long: &[&[&'static str]] = &[
+        &["Dn"],
+        &["#1-8", "8+2n"],
+        &["Dn", "8+2n"]];
+
+    //Some(two_ops).push(&src_types);
+    //Some(two_ops).push(&dest_types);
 
     unsafe {
         m68k_wrapper_init();
@@ -421,198 +467,217 @@ fn main() {
 
     let inst_2_ops_000 =
         [
-        /*
         Instruction {
             name: "abcd",
             desc: Some(ABCD_DESC),
-            matrix: two_ops,
-            override_imm: None,
+            matrix: Some(two_ops),
+            .. Instruction::default()
         },
-        */
-
         Instruction {
             name: "add",
             desc: Some(ADD_DESC),
-            matrix: two_ops,
-            override_imm: None,
+            matrix: Some(two_ops),
+            .. Instruction::default()
         },
-        Instruction {
-            name: "clr",
-            desc: Some(CLR_DESC),
-            matrix: one_op,
-            override_imm: None,
-        },
-        /*
         Instruction {
             name: "addq",
             desc: Some(ADDQ_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "addx",
             desc: Some(ADDX_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "and",
             desc: Some(AND_DESC),
+            matrix: Some(two_ops),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "asl",
+            desc: Some(ASL_ASR_DESC),
+            matrix: Some(two_ops),
+            override_output_w: Some(&shift_desc),
+            override_output_l: Some(&shift_desc_long),
             .. Instruction::default()
         },
         Instruction {
             name: "bchg",
             desc: Some(BCHG_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "bclr",
-            desc: Some(BCLR_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "bset",
             desc: Some(BSET_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "btst",
             desc: Some(BTST_DESC),
+            matrix: Some(two_ops),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "clr",
+            desc: Some(CLR_DESC),
+            matrix: Some(one_op),
             .. Instruction::default()
         },
         Instruction {
             name: "cmp",
             desc: Some(CMP_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "divu",
             desc: Some(DIVS_DIVU_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "divs",
             desc: Some(DIVS_DIVU_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "eor",
             desc: Some(EOR_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "exg",
             desc: Some(EXG_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "lea",
             desc: Some(LEA_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "move",
             desc: Some(MOVE_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "muls",
             desc: Some(MULS_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "mulu",
             desc: Some(MULU_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "or",
             desc: Some(OR_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "sub",
             desc: Some(SUB_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "subq",
             desc: Some(SUBQ_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
         Instruction {
             name: "subx",
             desc: Some(SUBX_DESC),
-            .. Instruction::default()
-        },
-        ];
-
-    let inst_1_ops_000 = [
-        Instruction {
-            name: "clr",
-            desc: Some(CLR_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "ext",
-            desc: Some(EXT_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "bsr",
-            desc: Some(BSR_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "jsr",
-            desc: Some(JSR_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "jmp",
-            desc: Some(JMP_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "neg",
-            desc: Some(NEG_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "not",
-            desc: Some(NOT_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "swap",
-            desc: Some(SWAP_DESC),
-            .. Instruction::default()
-        },
-        */
-        ];
-
-    /*
-    let inst_0_ops_000 = [
-        Instruction {
-            name: "nop",
-            desc: Some(NOP_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "illegal",
-            desc: None,
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "rte",
-            desc: Some(RTS_DESC),
-            .. Instruction::default()
-        },
-        Instruction {
-            name: "rts",
-            desc: Some(RTS_DESC),
+            matrix: Some(two_ops),
             .. Instruction::default()
         },
     ];
-    */
+
+    /*
+       let inst_1_ops_000 = [
+       Instruction {
+       name: "clr",
+       desc: Some(CLR_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "ext",
+       desc: Some(EXT_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "bsr",
+       desc: Some(BSR_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "jsr",
+       desc: Some(JSR_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "jmp",
+       desc: Some(JMP_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "neg",
+       desc: Some(NEG_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "not",
+       desc: Some(NOT_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "swap",
+       desc: Some(SWAP_DESC),
+       .. Instruction::default()
+       },
+       ];
+       */
+
+    /*
+       let inst_0_ops_000 = [
+       Instruction {
+       name: "nop",
+       desc: Some(NOP_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "illegal",
+       desc: None,
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "rte",
+       desc: Some(RTS_DESC),
+       .. Instruction::default()
+       },
+       Instruction {
+       name: "rts",
+       desc: Some(RTS_DESC),
+       .. Instruction::default()
+       },
+       ];
+       */
 
 
     for inst in &inst_2_ops_000 {
@@ -620,8 +685,10 @@ fn main() {
 
         print_instruction_header(inst);
         generate_table_2(inst.name, &inst, false);
-        generate_table_2(&name_long, &inst, true);
 
+        if !inst.has_override() {
+            generate_table_2(&name_long, &inst, true);
+        }
 
         //generate_table(inst.name, false, Some(&src_types), &dest_types);
         //generate_table(&name_long, true, Some(&src_types), &dest_types);
@@ -630,24 +697,24 @@ fn main() {
     // Generate instructions with one op
 
     /*
-    for inst in &inst_1_ops_000 {
-        let name_long = format!("{}.l", inst.name);
+       for inst in &inst_1_ops_000 {
+       let name_long = format!("{}.l", inst.name);
 
-        print_instruction_header(inst);
-        generate_table(inst.name, None, &dest_types);
-        generate_table(&name_long, None, &dest_types);
-    }
+       print_instruction_header(inst);
+       generate_table(inst.name, None, &dest_types);
+       generate_table(&name_long, None, &dest_types);
+       }
 
     //
 
     // Generate instructions with no ops
 
     for inst in &inst_0_ops_000 {
-        let name_long = format!("{}.l", inst.name);
+    let name_long = format!("{}.l", inst.name);
 
-        print_instruction_header(inst);
-        generate_table(inst.name, None, &dest_types_none);
-        generate_table(&name_long, None, &dest_types_none);
+    print_instruction_header(inst);
+    generate_table(inst.name, None, &dest_types_none);
+    generate_table(&name_long, None, &dest_types_none);
     }
     */
 }
