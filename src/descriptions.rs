@@ -590,9 +590,10 @@ pub const RTE_DESC: Description = Description {
 
 pub const SCC_DESC: Description = Description {
     description: "Tests the specified condition code; if the condition is true, sets the byte specified by the effective address to TRUE (all ones). Otherwise, sets that byte to FALSE (all zeros).",
-    operation: "If Condition True
-				   Then 1s → Destination
-				Else 0s → Destination",
+    operation: 
+"\n    If Condition True
+       Then 1s → Destination
+    Else 0s → Destination",
     assembler: &["Scc < ea >"],
     attributes: "Byte",
     flags: &FLAGS_NOT_AFFECTED,
