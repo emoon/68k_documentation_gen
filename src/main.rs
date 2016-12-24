@@ -626,7 +626,7 @@ fn main() {
 
     let dbcc_desc: &[&[&'static str]] = &[
         &["Displacement", "Branch Taken", "Branch Not Taken"],
-        &["", "cc true", "-", "18"],
+        &["", "cc true", "-", "12"],
         &["", "cc false, Count not Expired", "10", "-"],
         &["", "cc false, Counter Expired", "-", "14"]];
 
