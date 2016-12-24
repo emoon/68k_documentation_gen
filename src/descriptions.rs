@@ -40,7 +40,7 @@ const FLAGS_X: FlagsDesc = FlagsDesc {
 };
 
 const FLAGS_ABCD: FlagsDesc = FlagsDesc {
-    x: Flag::Set("X - Set the same as carry"),
+    x: Flag::Set("X — Set the same as carry"),
     n: Flag::Undefined,
     z: Flag::Clear("Z — Cleared if the result is nonzero; unchanged otherwise"),
     v: Flag::Undefined,
@@ -421,6 +421,14 @@ pub const LEA_DESC: Description = Description {
     flags: &FLAGS_NOT_AFFECTED,
 };
 
+pub const ILLEGAL_DESC: Description = Description {
+    description: "Forces an illegal instruction exception, vector number 4. All other illegal instruction bit patterns are reserved for future extension of the instruction set and should not be used to force an exception.",
+    operation: "SSP – 4 → SSP; PC → (SSP);  SSP – 2 → SSP; SR → (SSP);",
+    assembler: &["illegal"],
+    attributes: "Unsized",
+    flags: &FLAGS_NOT_AFFECTED,
+};
+
 pub const LINK_DESC: Description = Description {
     description: "Pushes the contents of the specified address register onto the stack. Then loads the updated stack pointer into the address register. Finally, adds the displacement value to the stack pointer. For word-size operation, the displacement is the sign-extended word following the operation word. For long size operation, the displacement is the long word following the operation word. The address register occupies one long word on the stack. The user should specify a negative displacement in order to allocate stack area.",
     operation: "SP – 4 → SP; An → (SP); SP → An; SP + dn → SP",
@@ -565,6 +573,17 @@ pub const RTS_DESC: Description = Description {
     description: "Pulls the program counter value from the stack. The previous program counter value is lost.",
     operation: "(SP) → PC; SP + 4 → SP",
     assembler: &["rts"],
+    attributes: "Unsized",
+    flags: &FLAGS_NOT_AFFECTED,
+};
+
+pub const RTE_DESC: Description = Description {
+    description: "Loads the processor state information stored in the exception stack frame located at the top of the stack into the processor. The instruction examines the stack format field in the format/offset word to determine how much information must be restored.",
+    operation: "
+    If Supervisor State  
+       Then (SP) → SR; SP + 2 → SP; (SP) → PC; SP + 4 → SP; Restore State and Deallocate Stack According to (SP)
+    Else TRAP",
+    assembler: &["rte"],
     attributes: "Unsized",
     flags: &FLAGS_NOT_AFFECTED,
 };
