@@ -349,7 +349,7 @@ pub const CMPM_DESC: Description = Description {
 };
 
 pub const DBCC_DESC: Description = Description {
-    description: "Description: Controls a loop of instructions. The parameters are a condition code, a data register (counter), and a displacement value. The instruction first tests the condition for termination; if it is true, no operation is performed. If the termination condition is not true, the low-order 16 bits of the counter data register decrement by one. If the result is – 1, execution continues with the next instruction. If the result is not equal to – 1, execution continues at the location indicated by the current value of the program counter plus the sign-extended 16-bit displacement. The value in the program counter is the address of the instruction word of the DBcc instruction plus two. The displacement is a twos complement integer that represents the relative distance in bytes from the current program counter to the destination program counter. Condition code cc specifies one of the following conditional tests:",
+    description: "Description: Controls a loop of instructions. The parameters are a condition code, a data register (counter), and a displacement value. The instruction first tests the condition for termination; if it is true, no operation is performed. If the termination condition is not true, the low-order 16 bits of the counter data register decrement by one. If the result is – 1, execution continues with the next instruction. If the result is not equal to – 1, execution continues at the location indicated by the current value of the program counter plus the sign-extended 16-bit displacement. The value in the program counter is the address of the instruction word of the DBcc instruction plus two. The displacement is a twos complement integer that represents the relative distance in bytes from the current program counter to the destination program counter. Most assemblers accept DBRA for DBF for use when only a count terminates the loop (no condition is tested).  Condition code cc specifies one of the following conditional tests:",
     operation: " If Condition False
                     Then (Dn – 1 → Dn; If Dn not equal – 1 Then PC + dn → PC)",
     assembler: &["dbcc dn, < label >"],
@@ -469,6 +469,15 @@ If the effective address is specified by the postincrement mode, only a memory-t
     flags: &FLAGS_NOT_AFFECTED,
 };
 
+pub const MOVEP_DESC: Description = Description {
+    description: "Moves data between a data register and alternate bytes within the address space starting at the location specified and incrementing by two. The high-order byte of the data register is transferred first, and the low-order byte is transferred last. The memory address is specified in the address register indirect plus 16-bit displacement addressing mode.",
+    operation: "Source → Destination",
+    assembler: &["movep Dx,(d16,Ay)", "movep (d16,Ay),Dx"],
+    attributes: "Word, Long",
+    flags: &FLAGS_NOT_AFFECTED,
+};
+
+
 pub const MOVEQ_DESC: Description = Description {
     description: "Moves a byte of immediate data to a 32-bit data register. The data in an 8-bit field within the operation word is sign- extended to a long operand in the data register as it is transferred.",
     operation: "Immediate Data → Destination",
@@ -579,9 +588,9 @@ pub const RTS_DESC: Description = Description {
 
 pub const RTE_DESC: Description = Description {
     description: "Loads the processor state information stored in the exception stack frame located at the top of the stack into the processor. The instruction examines the stack format field in the format/offset word to determine how much information must be restored.",
-    operation: "
+    operation: "\n
     If Supervisor State  
-       Then (SP) → SR; SP + 2 → SP; (SP) → PC; SP + 4 → SP; Restore State and Deallocate Stack According to (SP)
+       Then (SP) → SR; SP + 2 → SP; (SP) → PC; SP + 4 → SP
     Else TRAP",
     assembler: &["rte"],
     attributes: "Unsized",
@@ -590,10 +599,10 @@ pub const RTE_DESC: Description = Description {
 
 pub const SCC_DESC: Description = Description {
     description: "Tests the specified condition code; if the condition is true, sets the byte specified by the effective address to TRUE (all ones). Otherwise, sets that byte to FALSE (all zeros).",
-    operation: 
-"\n    If Condition True
-       Then 1s → Destination
-    Else 0s → Destination",
+    operation:"\n
+   If Condition True
+      Then 1s → Destination
+   Else 0s → Destination",
     assembler: &["Scc < ea >"],
     attributes: "Byte",
     flags: &FLAGS_NOT_AFFECTED,
@@ -641,6 +650,29 @@ pub const TAS_DESC: Description = Description {
     assembler: &["tas < ea >"],
     attributes: "Byte",
     flags: &FLAGS_TAS,
+};
+
+pub const TRAP_DESC: Description = Description {
+    description: "Causes a TRAP # < vector > exception. The instruction adds the immediate operand (vector) of the instruction to 32 to obtain the vector number. The range of vector values is 0 – 15, which provides 16 vectors.",
+    operation: "\n
+    1 → S-Bit of SR
+    SSP – 4 → SSP 
+    PC → (SSP); 
+    SSP – 2 → SSP; 
+    SR → (SSP); Vector Address → P",
+    assembler: &["trap # < vector >"],
+    attributes: "Unsized",
+    flags: &FLAGS_NOT_AFFECTED,
+};
+
+pub const TRAPV_DESC: Description = Description {
+    description: "If the overflow condition is set, causes a TRAPV exception with a vector number 7. If the overflow condition is not set, the processor performs no operation and execution continues with the next instruction.",
+    operation: "\n
+    If V 
+        Then Trap",
+    assembler: &["trapv"],
+    attributes: "Unsized",
+    flags: &FLAGS_NOT_AFFECTED,
 };
 
 pub const TST_DESC: Description = Description {

@@ -193,10 +193,10 @@ fn print_table(name: &str, cycles: &Vec<BuildResult>, dest_table: &[Op]) {
 }
 
 fn check_affected(flag_desc: &FlagsDesc) -> bool {
-    flag_desc.x.is_affected() &&
-    flag_desc.n.is_affected() &&
-    flag_desc.z.is_affected() &&
-    flag_desc.v.is_affected() &&
+    flag_desc.x.is_affected() ||
+    flag_desc.n.is_affected() ||
+    flag_desc.z.is_affected() ||
+    flag_desc.v.is_affected() ||
     flag_desc.c.is_affected()
 }
 
@@ -591,14 +591,12 @@ fn main() {
         &["CC (HI)", "Carry Clear","LS","Low or Same"],
         &["CS (LO)", "Carry Set",  "LT","Less Than"],
         &["EQ", "Equal", "MI","Minus"],
-        &["GE", "Greater or Equal","NE","Not Equal"],
-        &["GT", "Greather Than","PL","Plus"],
+        &["F", "False", "No", "Not Equal"],
+        &["GE", "Greater or Equal","PL","PLus"],
+        &["GT", "Greather Than","T","True"],
         &["HI", "High","VC","Overflow Clear"],
         &["LE", "Less or Equal","VS","Overflow Set"]];
 
-    //let dest_types_none = [Op::new("", "")];
-
-    //let mut Some(two_ops) = Vec::<&[Op]>::new();
     let two_ops: &[&[Op]] = &[&src_types, &dest_types];
     let one_op: &[&[Op]] = &[&dest_types];
     let no_ops: &[&[Op]] = &[&[]];
@@ -630,26 +628,37 @@ fn main() {
         &["", "cc false, Count not Expired", "10", "-"],
         &["", "cc false, Counter Expired", "-", "14"]];
 
-    let branch_header: &[&'static str] = &["(An)", "(d16,An)", "(d8,An,Xn)", "(xxx).W", "(xxx).L", "(d16,PC)", "(d8,PC,Xn)"];
+    let branch_header: &[&'static str] = 
+        &["(An)", "(d16,An)", "(d8,An,Xn)", "(xxx).W", "(xxx).L", "(d16,PC)", "(d8,PC,Xn)"];
 
     let jmp_desc: &[&[&'static str]] = &[
-       branch_header ,
+       branch_header,
        &["", "8", "10", "14", "10", "12", "10", "14"]];
 
     let jsr_desc: &[&[&'static str]] = &[
-       branch_header ,
+       branch_header,
        &["", "16", "18", "22", "18", "20", "18", "22"]];
 
     let lea_desc: &[&[&'static str]] = &[
-       branch_header ,
+       branch_header,
        &["", "4", "8", "12", "8", "12", "8", "12"]];
+
+    let movem_desc: &[&[&'static str]] = &[
+        &["Size", "(An)", "(An)+", "-(An)", "(d16,An)", "(d8,An,Xn)", "(xxx).W", "(xxx).L", "(d16,PC)", "(d8,PC,Xn)"],
+        &["M -> R", "Word", "12+4n", "12+4n", "-", "16+4n", "18+4n", "16+4n", "20+4n", "16+4n", "18+4n"],
+        &["M -> R", "Long", "12+8n", "12+8n", "-", "16+8n", "18+8n", "16+8n", "20+8n", "16+8n", "18+8n"],
+        &["R -> M", "Word", "8+4n", "-", "8+4n", "12+4n", "14+4n", "12+4n", "16+4n", "-", "-"],
+        &["R -> M", "Long", "8+8n", "-", "8+8n", "12+8n", "14+8n", "12+8n", "16+8n", "-", "-"]];
+
+    let trap_desc: &[&[&'static str]] = &[
+        &["# <vector> "],
+        &["", "34"]];
+
+    let trapv_desc: &[&[&'static str]] = &[&["34"]];
 
     //let pea_desc: &[&[&'static str]] = &[
      //  branch_header ,
      //  &["12", "16", "20", "16", "20", "16", "20"]];
-
-    //Some(two_ops).push(&src_types);
-    //Some(two_ops).push(&dest_types);
 
     unsafe {
         m68k_wrapper_init();
@@ -733,13 +742,6 @@ fn main() {
             .. Instruction::default()
         },
         Instruction {
-            name: "dbcc",
-            desc: Some(DBCC_DESC),
-            cc_codes: Some(&cc_codes),
-            override_output_w: Some(&dbcc_desc),
-            .. Instruction::default()
-        },
-        Instruction {
             name: "clr",
             desc: Some(CLR_DESC),
             matrix: Some(one_op),
@@ -749,6 +751,13 @@ fn main() {
             name: "cmp",
             desc: Some(CMP_DESC),
             matrix: Some(two_ops),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "dbcc",
+            desc: Some(DBCC_DESC),
+            cc_codes: Some(&cc_codes),
+            override_output_w: Some(&dbcc_desc),
             .. Instruction::default()
         },
         Instruction {
@@ -824,6 +833,24 @@ fn main() {
         Instruction {
             name: "move",
             desc: Some(MOVE_DESC),
+            matrix: Some(two_ops),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "movem",
+            desc: Some(MOVEM_DESC),
+            override_output_w: Some(&movem_desc),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "movep",
+            desc: Some(MOVEP_DESC),
+            matrix: Some(two_ops),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "moveq",
+            desc: Some(MOVEQ_DESC),
             matrix: Some(two_ops),
             .. Instruction::default()
         },
@@ -945,8 +972,15 @@ fn main() {
             .. Instruction::default()
         },
         Instruction {
-            name: "swap",
-            desc: Some(SWAP_DESC),
+            name: "trap",
+            desc: Some(TRAP_DESC),
+            override_output_w: Some(&trap_desc),
+            .. Instruction::default()
+        },
+        Instruction {
+            name: "trapv",
+            desc: Some(TRAPV_DESC),
+            override_output_w: Some(&trapv_desc),
             matrix: Some(one_op),
             .. Instruction::default()
         },
